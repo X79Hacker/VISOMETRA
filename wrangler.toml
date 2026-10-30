@@ -1,0 +1,48 @@
+# Sector Map on Cloudflare Workers (static assets + API).
+#   npm run dev        local server with local D1/KV (put SITE_USERS in .dev.vars)
+#   npm run deploy     deploy to https://sector-map.prashansa.com.np
+#   npm run db:migrate apply migrations/ to the online database
+# The logins are NOT here: they are the SITE_USERS secret (see README).
+name = "sector-map"
+main = "src/index.js"
+compatibility_date = "2026-10-20"
+upload_source_maps = true
+
+# Only the custom domain; no *.workers.dev or preview URLs to keep track of.
+workers_dev = false
+preview_urls = false
+routes = [
+  { pattern = "sector-map.prashansa.com.np", custom_domain = true }
+]
+
+# The pages, scripts and styles in public/. The Worker runs first on every
+# request so that nothing — not even a static page — is served without a login.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+# Workers Logs: requests, errors and console output in the dashboard (free plan).
+[observability]
+enabled = true
+
+# Images' details, drawings, traces, Saved Results and the History Log.
+[[d1_databases]]
+binding = "DB"
+database_name = "sector-map-data"
+database_id = "b4a9cfac-e2a8-41bc-a771-330abf4f0266"
+migrations_dir = "migrations"
+
+# The image files themselves, one KV value each (up to 25 MB).
+[[kv_namespaces]]
+binding = "IMAGES"
+id = "1a4d75d189b64db189e09a972c6677f3"
+
+# Slows down password guessing: 10 login / re-login attempts per minute per address.
+[[ratelimits]]
+name = "LOGIN_LIMIT"
+namespace_id = "4721"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60

@@ -1,0 +1,11 @@
+VISOMETRA / SAM AI Assist
+
+SlimSAM weights from nielsr/slimsam-77-uniform and Xenova/slimsam-77-uniform.
+License: Apache License, Version 2.0 (included).
+Modifications: restored the checkpoint's native learned box-corner embeddings for
+SAM prompt labels 2 and 3 in both ONNX prompt encoder / mask decoder exports.
+The vision encoder and trained decoder weights are otherwise unchanged.
+
+Transformers.js: Copyright Hugging Face, Apache License 2.0.
+ONNX Runtime: Copyright Microsoft Corporation, MIT license (included).
+Lucide: ISC license (included).

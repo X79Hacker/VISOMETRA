@@ -1,0 +1,5 @@
+# Official Meta predictor; no substitute motion model is used for SAM 2 mode.
+# The optional CUDA extension is disabled by the setup script; inference still works.
+git+https://github.com/facebookresearch/sam2.git
+Pillow>=10.0
+numpy>=1.24

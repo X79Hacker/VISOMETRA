@@ -1,0 +1,6 @@
+transformers==5.20.2
+accelerate==1.15.0
+huggingface-hub>=1.0
+pillow>=10.0
+numpy>=1.26
+safetensors>=0.5

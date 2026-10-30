@@ -1,0 +1,25 @@
+# measurements, images and drawings saved by server.py (personal data)
+results/
+data/
+
+# Cloudflare: local dev state, and .dev.vars holds passwords for `npm run dev`
+.wrangler/
+.dev.vars
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Optional SAM 3 local runtime
+.venv-sam3/
+models/
+__pycache__/
+*.pyc

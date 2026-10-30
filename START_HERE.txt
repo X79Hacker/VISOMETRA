@@ -1,0 +1,40 @@
+SEQUENCE STUDIO V6
+Start with docs/SEQUENCE_STUDIO.md for the 12 new features and folder import.
+SAM 2.1 tracking requires setup-sam2-windows.bat once; bundled tools work immediately.
+
+VISOMETRA - CURVE STUDIO (27 October 2026)
+
+1. Stop your old server with Ctrl+C.
+2. Extract this ZIP into a NEW folder. Do not run from inside the ZIP.
+3. COPY your existing data/ and results/ into the new folder. Keep the old
+   folder as a backup. Optional SAM 3 still needs its separate setup/weights.
+4. Double-click start-windows.bat and keep its terminal open.
+5. Log in at http://127.0.0.1:8763/dashboard-front.html and press Ctrl+F5.
+6. Open a frame in Curve Studio. Generate a mask or open a saved project.
+
+EDIT YOUR OUTLINE
+- Run Fourier / Edit anchors reveals the diamond handles.
+- Drag filled diamonds to move anchors.
+- Hollow midpoint diamonds insert a point between two anchors. Drag directly
+  or use + Point / double-click an edge. Curve subdivision preserves its shape.
+- Select an anchor, choose Bezier curve, then drag the circular handles.
+- Smooth anchor links tangents; Sharp corner collapses that anchor's handles.
+- Arrow keys nudge 1 pixel; Shift + arrows nudges 10. Delete removes a point.
+- Undo / Redo includes complete curve edits. Wheel zooms; Space + drag pans.
+- Run Fourier or leave Recompute after edits enabled to update the analysis.
+
+WORKSPACE
+- Left inspector: Select / Curves / Measure.
+- Right inspector: Export / Validate / Model, with live measurements.
+- Below image: Fourier & measurements / Sequence, tracking & batch.
+- Dashboard activity/totals are expandable, not removed.
+
+SAVING AND PRECISION
+Save episode frame stores the editable handles in the workspace. Download
+complete project keeps a portable copy. SVG exports real curves. CSV samples
+an adaptive 0.15-pixel polyline. Curve area is analytic; perimeter/Fourier use
+that polyline. Masks and benchmarks use the rasterized edited outline.
+
+All previous grid, Trace, cell editor, AI, Fourier animation, episodes, Lab,
+tracking, sensor fields, review and backup tools remain available.
+Full guide: docs/CURVE_STUDIO.md. Episode guide: docs/EPISODE_LAB.md.

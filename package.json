@@ -1,0 +1,25 @@
+{
+  "name": "visometra",
+  "private": true,
+  "type": "module",
+  "description": "VISOMETRA \u2014 visual geometry, contour analysis, and sequence intelligence studio",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "cf d1 migrations apply b4a9cfac-e2a8-41bc-a771-330abf4f0266 --dir migrations",
+    "db:migrate:local": "wrangler d1 migrations apply sector-map-data --local",
+    "logs": "wrangler tail",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261019.1": true
+  }
+}

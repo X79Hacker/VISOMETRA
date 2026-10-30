@@ -1,0 +1,5 @@
+Bundled text weights: Xenova/clipseg-rd64-refined, quantized ONNX conversion of CIDAS/clipseg-rd64-refined.
+Base model card declares Apache-2.0: https://huggingface.co/CIDAS/clipseg-rd64-refined
+Original CLIPSeg source: https://github.com/timojl/clipseg (MIT source license included separately).
+Model file revision and SHA-256 hashes are recorded in models/clipseg-trace-v1/SOURCE.json.
+Text masks are coarse semantic proposals. This app refines up to eight proposals with SlimSAM.

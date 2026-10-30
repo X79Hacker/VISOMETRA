@@ -1,0 +1,4 @@
+VISOMETRA SEQUENCE STUDIO V6 — 30 October 2026
+All 12 requested upgrades plus folder import. Read docs/SEQUENCE_STUDIO.md.
+Original engines and files retained. Optional SAM 2.1 requires one-time setup.
+Default local port 8763. Stop old server, extract to a new folder, copy data/ and results/, run start-windows.bat, Ctrl+F5.
