@@ -1,0 +1,2170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Epicycle Editor</title>
+<style>
+:root{
+  --bg:#05060f;--bar:#080a16;--panel:#0a0c1a;--panel-2:#0c0f1c;
+  --line:#1c2137;--line-2:#262c47;
+  --green:#00ff9d;--green-2:#00e676;
+  --cyan:#3ee6ff;--pink:#e040fb;--amber:#ffc400;--red:#ff4d6a;
+  --text:#dfe4f5;--text-dim:#8790b5;--text-mute:#565f85;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scrollbar-color:var(--line) #080a16}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:Consolas,'Courier New',ui-monospace,monospace;
+  font-size:13px;line-height:1.5;overflow:hidden;
+  display:flex;flex-direction:column;
+}
+
+/* ================= topbar ================= */
+.topbar{
+  height:60px;display:flex;align-items:center;gap:14px;padding:0 20px;
+  background:var(--bar);border-bottom:1px solid var(--line);
+  flex-wrap:nowrap;overflow:hidden;
+}
+.back-btn{
+  background:var(--panel);color:var(--text-dim);
+  border:1px solid var(--line-2);padding:10px 18px;
+  font-family:inherit;font-size:12px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;cursor:pointer;transition:all .15s;
+  display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;
+}
+.back-btn:hover:not(:disabled){border-color:var(--green);color:var(--green)}
+.back-btn:disabled{opacity:.35;cursor:default}
+.title-block{display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden}
+.title-main{color:var(--green);font-size:15px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
+.title-slash{color:var(--text-mute);font-weight:700}
+.title-cell{color:var(--amber);font-size:14px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.topbar .spacer{flex:1}
+.zoom-pill{
+  display:flex;align-items:center;gap:2px;flex-shrink:0;
+  background:var(--panel);border:1px solid var(--line-2);padding:4px 6px;margin-left:22px;
+}
+.zoom-pill button{
+  background:transparent;border:none;color:var(--text-dim);
+  font-family:inherit;font-size:15px;line-height:1;
+  width:24px;height:24px;cursor:pointer;transition:color .15s;
+}
+.zoom-pill button:hover{color:var(--green)}
+.zoom-pill .zicon{display:flex;align-items:center;justify-content:center;width:26px;height:24px;color:var(--text-dim)}
+.zoom-pill .zicon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2}
+.zoom-pill .zval{color:var(--text-mute);font-size:11px;padding:0 6px;min-width:40px;text-align:center}
+.progress-wrap{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.progress-outer{width:170px;height:10px;background:#0f1424;border:1px solid var(--line-2);overflow:hidden}
+.progress-inner{height:100%;background:var(--green);width:0%;transition:width .3s}
+.progress-label{color:var(--green);font-size:12px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+
+/* ================= tool row ================= */
+.btn-row{display:flex;align-items:center;gap:10px;padding:14px 20px;flex-wrap:nowrap;overflow-x:auto;border-bottom:1px solid var(--line)}
+.online-tag{color:var(--text-dim);font-size:12px;letter-spacing:.6px;white-space:nowrap}
+.online-tag b{color:var(--text)}
+.mode-btn{
+  background:var(--panel);color:var(--text);
+  border:1px solid var(--line-2);padding:10px 18px;
+  font-family:inherit;font-size:11px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;
+}
+.mode-btn:hover{border-color:var(--green);color:var(--green)}
+.mode-btn.on{background:rgba(0,255,157,.13);border-color:var(--green);color:var(--green)}
+.mode-btn.on2{background:rgba(62,230,255,.12);border-color:var(--cyan);color:var(--cyan)}
+.mode-btn.go{background:var(--green);color:#02160c;border-color:var(--green)}
+.mode-btn.go:hover{background:#2dffb8}
+.mode-btn.warn{border-color:rgba(255,196,0,.5);color:var(--amber)}
+.mode-btn.warn:hover{background:rgba(255,196,0,.12);border-color:var(--amber)}
+.mode-btn:disabled{opacity:.35;cursor:not-allowed}
+.db-state{font-size:11px;color:var(--text-mute);white-space:nowrap;flex-shrink:0}
+.db-state.ok{color:var(--green-2)} .db-state.err{color:var(--red)} .db-state.busy{color:var(--amber)}
+
+/* ================= layout ================= */
+.ed-body{flex:1 1 0;min-height:0;display:flex;overflow:hidden}
+.ed-canvas-wrap{flex:1;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at center,#0b0f1e,#04040c);overflow:hidden}
+/* No border: a border makes the outer 1px unreachable and getBoundingClientRect()
+   includes it, which shifted every drawn point and capped a full-cover shape
+   slightly below the true patch size. */
+#edCanvas{background:transparent;cursor:crosshair;touch-action:none;box-shadow:0 0 0 1px var(--line)}
+#edCanvas.drawing{box-shadow:0 0 0 1px var(--green)}
+#edCanvas.grab{cursor:grab}
+#edCanvas.grabbing{cursor:grabbing}
+.zoom button.on{border-color:var(--green);color:var(--green);background:rgba(0,255,157,.13)}
+.hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(135,144,181,.4);text-align:center;font-size:14px;pointer-events:none;line-height:2}
+.hint small{display:block;font-size:11px}
+.pad{position:absolute;top:14px;left:14px;background:rgba(8,10,22,.94);border:1px solid var(--line);padding:7px 11px;font-size:11px;color:var(--amber)}
+.pad.tr{left:auto;right:14px;color:var(--cyan);display:none}
+.pad.tr.on{display:block}
+.zoom{position:absolute;bottom:14px;right:14px;display:flex;gap:4px;align-items:center;background:rgba(8,10,22,.94);border:1px solid var(--line);padding:5px}
+/* previous / next in the bottom-left corner of the drawing area */
+.corner-nav{position:absolute;bottom:14px;left:14px;z-index:6;display:flex;gap:4px;align-items:center;background:rgba(8,10,22,.94);border:1px solid var(--line);padding:5px}
+.corner-nav button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);height:30px;padding:0 12px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.corner-nav button:hover{border-color:var(--green);color:var(--green)}
+.corner-nav button.paused{border-color:var(--amber,#ffc400);color:var(--amber,#ffc400)}
+.zoom button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);width:30px;height:30px;cursor:pointer;font-family:inherit;font-size:15px}
+.zoom button:hover{border-color:var(--green);color:var(--green)}
+.zoom span{color:var(--text-mute);font-size:11px;padding:0 8px}
+
+/* ================= side panel ================= */
+.ed-side{width:360px;flex-shrink:0;overflow-y:auto;background:var(--bar);border-left:1px solid var(--line);padding:14px}
+.ed-side::-webkit-scrollbar{width:7px}
+.ed-side::-webkit-scrollbar-thumb{background:var(--line-2)}
+.status{border:1px solid var(--line);padding:9px 12px;font-size:11px;margin-bottom:12px;color:var(--text-dim)}
+.status.ok{border-color:rgba(0,230,118,.35);color:var(--green-2)}
+.status.warn{border-color:rgba(255,196,0,.35);color:var(--amber)}
+.status.err{border-color:var(--red);color:var(--red)}
+.status.cont{border-color:rgba(62,230,255,.4);color:var(--cyan)}
+.panel{border:1px solid var(--line);background:var(--panel);margin-bottom:10px}
+.panel-head{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;cursor:pointer;user-select:none}
+.panel-head h4{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--amber)}
+.panel-head .tg{color:var(--text-mute);font-size:10px;cursor:pointer;padding:2px 6px}
+.panel-body{padding:0 14px 14px;max-height:900px;overflow:hidden;transition:max-height .25s,padding .25s,opacity .2s;opacity:1}
+.panel-body.collapsed{max-height:0;padding-top:0;padding-bottom:0;opacity:0}
+.ri{background:var(--panel-2);border-left:3px solid var(--line);padding:8px 11px;margin-bottom:5px}
+.ri .rk{color:var(--text-mute);font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+.ri .rv{font-size:13px;font-weight:700;margin-top:2px;color:var(--text)}
+.ri.ok{border-left-color:var(--green-2)} .ri.ok .rv{color:var(--green-2)}
+.ri.ac{border-left-color:var(--cyan)} .ri.ac .rv{color:var(--cyan)}
+.ri.am{border-left-color:var(--amber)} .ri.am .rv{color:var(--amber)}
+.ri.pk{border-left-color:var(--pink)} .ri.pk .rv{color:var(--pink)}
+.ri.rd{border-left-color:var(--red)} .ri.rd .rv{color:var(--red)}
+.ri.hide{display:none}
+.cr{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px}
+.cr label{flex:0 0 62px;color:var(--text-dim)}
+.cr input[type=range]{flex:1;accent-color:var(--green)}
+.cr .v{flex:0 0 48px;text-align:right;color:var(--green);font-weight:700}
+.tog{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text-dim);cursor:pointer;padding:3px 0}
+.tog input{accent-color:var(--green)}
+.tip{border-left:3px solid var(--cyan);background:rgba(62,230,255,.07);padding:9px 11px;font-size:10px;color:var(--text-dim);line-height:1.7}
+.tip b{color:var(--cyan)}
+.eqbox{background:var(--panel-2);border:1px solid var(--line);padding:10px;font-size:10px;line-height:1.8;max-height:160px;overflow-y:auto;color:var(--text-dim)}
+.eqbox .et{color:var(--pink);font-weight:700;font-size:11px;margin-bottom:4px}
+.eqbox .ev{color:var(--green)} .eqbox .en{color:var(--amber);font-weight:700}
+.ctable-wrap{max-height:250px;overflow-y:auto;border:1px solid var(--line)}
+.ctable{width:100%;border-collapse:collapse;font-size:10px}
+.ctable th{position:sticky;top:0;background:var(--panel-2);color:var(--text-dim);padding:7px 5px;text-align:left;cursor:pointer;white-space:nowrap;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line)}
+.ctable th:hover{color:var(--green)}
+.ctable td{padding:4px 5px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text-dim);font-size:10px}
+.ctable tr.hl td{color:var(--green);background:rgba(0,230,118,.05)}
+.ctable .fp{color:var(--green-2)} .ctable .fn{color:var(--pink)} .ctable .fz{color:var(--amber)}
+.spec{width:100%;height:110px;background:var(--panel-2);border:1px solid var(--line)}
+
+/* ================= modals ================= */
+.modal{position:fixed;inset:0;z-index:200;background:rgba(3,4,10,.9);display:none;align-items:center;justify-content:center;padding:20px}
+.modal.open{display:flex}
+.modal-box{background:var(--panel);border:1px solid var(--line-2);padding:22px 24px;width:100%;max-width:800px;max-height:86vh;overflow-y:auto}
+.modal-box h3{color:var(--amber);font-size:13px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:16px}
+/* Pen: a slim vertical panel on the left edge of the drawing area */
+.left-tools{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;align-items:stretch;gap:8px;width:58px}
+.pen-box{display:flex;flex-direction:column;align-items:center;gap:7px;padding:10px 7px;border:1px solid var(--line-2);background:rgba(8,10,22,.94)}
+.left-tools .mode-btn{padding:7px 4px;font-size:9.5px;letter-spacing:.5px;white-space:normal;line-height:1.35;text-align:center}
+.pen-lbl{color:var(--text-dim);font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.pen-sw{width:20px;height:20px;border:1px solid var(--line-2);cursor:pointer;padding:0;outline:none;flex-shrink:0}
+.pen-sw.on{box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--green)}
+.pen-box input[type=range]{writing-mode:vertical-lr;direction:rtl;width:18px;height:90px;margin:2px 0;accent-color:var(--green);cursor:pointer}
+.pen-val{color:var(--green);font-size:10px;text-align:center;white-space:nowrap}
+.hidden{display:none!important}
+
+.nosel{padding:60px 20px;text-align:center;color:var(--text-mute)}
+</style>
+<link rel="stylesheet" href="sam/assist.css">
+<link rel="stylesheet" href="episodes/theme.css">
+<script src="episodes/store.js"></script>
+<link rel="stylesheet" href="episodes/polish.css">
+<link rel="stylesheet" href="studio/sequence.css"><script src="classic-anchors.js"></script></head>
+<body>
+
+<div class="topbar">
+  <button class="back-btn" id="btnBack">&#8592; Matrix</button>
+  <button class="back-btn" id="btnUndo" title="Undo the last change in this cell (Ctrl+Z)" disabled>&#8630; Undo</button>
+  <button class="back-btn" id="btnRedo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" disabled>&#8631; Redo</button>
+  <div class="title-block">
+    <span class="title-main" id="edTitle">VISOMETRA</span>
+    <span class="title-slash">//</span>
+    <span class="title-cell" id="edCell">Cell</span>
+  </div>
+  <div class="zoom-pill">
+    <button id="btnGridOut" title="Zoom out">&minus;</button>
+    <span class="zicon"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg></span>
+    <button id="btnGridIn" title="Zoom in">+</button>
+    <span class="zval" id="gridZoomLabel">100%</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="progress-wrap">
+    <div class="progress-outer"><div class="progress-inner" id="progBar"></div></div>
+    <div class="progress-label" id="progLabel">0/256</div>
+  </div>
+</div>
+
+<div class="btn-row">
+  <button class="mode-btn" id="btnSam" title="Preview AI segmentation with the included offline model or optional real SAM 3, then use its boundary">AI outline</button>
+  <a class="mode-btn" id="openStudioV3" href="outline-studio.html" style="text-decoration:none;border-color:#38ba92;color:#83efca">Sequence Studio</a>
+  <span class="online-tag">ONLINE: <b id="onlineUser">&mdash;</b></span>
+  <button class="mode-btn" id="btnFollow" title="Follow (key F): when zoomed in, each new Bézier anchor glides to the centre and the cell scrolls when the mouse nears an edge. Right-drag or middle-drag pans.">Follow: Off</button>
+  <button class="mode-btn" id="btnPresets" title="Drawing tool (Freehand / Bézier / Rect / Circle) and shape presets">Presets · Freehand</button>
+  <button class="mode-btn warn" id="btnContinue" style="display:none">Continue</button>
+  <button class="mode-btn warn" id="btnFinish" style="display:none">Finish</button>
+  <button class="mode-btn warn" id="btnEditOutline" style="display:none" title="Turn this cell's outline (e.g. the piece traced on the whole image) into a Bézier you can correct here: drag anchors, add / delete them, flip segments straight / curved">&#9998; Edit Outline</button>
+  <button class="mode-btn" id="btnClearPatch">Clear</button>
+  <button class="mode-btn go" id="btnCompute">Compute</button>
+  <button class="mode-btn" id="btnExportCirclesCsv">Circles CSV</button>
+  <button class="mode-btn" id="btnExportCirclesJson">Circles JSON</button>
+  <button class="mode-btn" id="btnSaveDb" title="Save this cell's results (areas, amplitude, phase, frequency of every circle) to the CSV files in the results folder. Happens automatically after every COMPUTE.">&#128190; Save to CSV</button>
+  <span class="db-state" id="dbState"></span>
+  <a class="mode-btn" href="results.html" style="text-decoration:none">Saved Results</a>
+</div>
+
+<div class="ed-body">
+  <div class="nosel" id="emptyState" style="display:none">No VISOMETRA loaded. Open the Dashboard to choose a file.</div>
+  <div class="ed-canvas-wrap" id="canvasWrap">
+    <div class="left-tools" id="leftTools">
+      <div class="pen-box" id="penBox" title="Pen: outline colour and width"></div>
+      <button class="mode-btn on2" id="btnSegMode" style="display:none" title="Type of the next segment you place (key L). Ctrl-click places the other type once. Alt-click an existing segment to flip it.">Next: Curve</button>
+    </div>
+    <canvas id="edCanvas"></canvas>
+    <div class="hint" id="edHint">DRAW HERE<small>Release mouse &middot; Click green dot to continue &middot; Red dot to close</small></div>
+    <div class="pad" id="padInfo"></div>
+    <div class="pad tr" id="padContinue"></div>
+    <div class="corner-nav">
+      <button id="btnCornerPrev" title="Previous cell ( ← )  ·  [ / ] previous / next image">&#9664; Previous</button><button id="btnCornerNext" title="Next cell ( → )  ·  [ / ] previous / next image">Next &#9654;</button><button id="btnEpiPause" title="Stop / play the moving circles ( P ) — stopping also frees the browser while you work">&#10074;&#10074; Stop circles</button>
+    </div>
+    <div class="zoom">
+      <button id="btnZOut" title="Zoom out (−)">&minus;</button><span id="zoomLabel">100%</span><button id="btnZIn" title="Zoom in (+)">+</button><button id="btnZFit" title="Fit the whole cell (0)" style="width:auto;padding:0 8px;font-size:11px">Fit</button><button id="btnHand" title="Move (H, or hold Space): drag with the left mouse button to move the zoomed cell. Also: right-drag, touchpad swipe, Shift + wheel, Shift + arrow keys" style="width:auto;padding:0 8px;font-size:11px">&#9995; Move</button>
+    </div>
+  </div>
+  <div class="ed-side">
+    <div class="status ok" id="patchStatus">Ready</div>
+
+    <div class="panel" id="panelCircles">
+      <div class="panel-head"><h4>Circles &middot; Amplitude &middot; Phase &middot; Frequency</h4><span class="tg">&#9660;</span></div>
+      <div class="panel-body">
+        <div class="ctable-wrap">
+          <table class="ctable">
+            <thead><tr><th>#</th><th data-s="k" title="Frequency k: turns per trip around the curve (+ CCW, - CW)">Freq k</th><th data-s="amp" id="thAmp" title="Circle radius">Amp</th><th data-s="ph" title="Starting angle at t=0">Phase&deg;</th><th data-s="ph">Phase rad</th><th data-s="dir">Dir</th><th data-s="cum" title="Running area after adding circles 1..#">Cum Area</th></tr></thead>
+            <tbody id="circleTableBody"><tr><td colspan="7" style="text-align:center;padding:18px;color:var(--text-mute)">Compute to see circle data</td></tr></tbody>
+          </table>
+        </div>
+        <div class="tip" style="margin-top:8px">Each row is one circle: <b>z(t) += Amp &middot; e<sup>i(2&pi;&middot;k&middot;t + Phase)</sup></b>, t = 0&rarr;1 once around the curve. Click a header to sort. Export with <b>Circles CSV / JSON</b>.</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h4>Center (Z[0])</h4><span class="tg">&#9660;</span></div>
+      <div class="panel-body">
+        <div class="ri am"><div class="rk">Center X</div><div class="rv" id="rCX">&mdash;</div></div>
+        <div class="ri am"><div class="rk">Center Y</div><div class="rv" id="rCY">&mdash;</div></div>
+        <div class="ri am"><div class="rk">Center (px)</div><div class="rv" id="rCP">&mdash;</div></div>
+        <div class="tip" style="margin-top:8px"><b>Z[0]</b> is the centroid of your path &mdash; the origin from which all epicycles rotate.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h4>Settings</h4><span class="tg">&#9660;</span></div>
+      <div class="panel-body">
+        <div class="cr"><label>Circles</label><input type="range" id="rngCircles" min="1" max="500" value="200"><span class="v" id="valCircles">200</span></div>
+        <div class="cr"><label>Speed</label><input type="range" id="rngSpeed" min="0.1" max="5" step="0.1" value="1"><span class="v" id="valSpeed">1.0x</span></div>
+        <label class="tog"><input type="checkbox" id="chkCircles" checked> Show circles</label>
+        <label class="tog"><input type="checkbox" id="chkArms" checked> Show arms</label>
+        <label class="tog"><input type="checkbox" id="chkTrail" checked> Show trail</label>
+        <div class="tip" style="margin-top:8px"><b>Continue drawing:</b> Draw, release, then click the <b>green dot</b> to continue from where you stopped. Click the <b>red dot</b> to close the shape.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h4>Measurements</h4><span class="tg">&#9660;</span></div>
+      <div class="panel-body">
+        <div class="ri pk hide" id="rowBez"><div class="rk">Area (Exact - Bézier curve)</div><div class="rv" id="rAreaB">&mdash;</div></div>
+        <div class="ri ok"><div class="rk">Area (Exact - Shoelace)</div><div class="rv" id="rArea">&mdash;</div></div>
+        <div class="ri ac"><div class="rk">Area (Fourier)</div><div class="rv" id="rAreaF">&mdash;</div></div>
+        <div class="ri pk hide" id="rowExp"><div class="rk">Expected (Analytical)</div><div class="rv" id="rExp">&mdash;</div><div class="rk" id="rExpF"></div></div>
+        <div class="ri rd hide" id="rowErr"><div class="rk">% Error vs Analytical</div><div class="rv" id="rErrPct">&mdash;</div></div>
+        <div class="ri"><div class="rk">Perimeter</div><div class="rv" id="rPerim">&mdash;</div></div>
+        <div class="ri"><div class="rk">Bounding Size</div><div class="rv" id="rSize">&mdash;</div></div>
+        <div class="ri"><div class="rk">Direction</div><div class="rv" id="rDir">&mdash;</div></div>
+        <div class="ri"><div class="rk">Reconstruction Error</div><div class="rv" id="rErr">&mdash;</div></div>
+        <div class="ri"><div class="rk">Max Possible Area</div><div class="rv" id="rMax">&mdash;</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h4>Equation</h4><span class="tg">&#9660;</span></div>
+      <div class="panel-body"><div class="eqbox" id="eqBox">Compute epicycles to reveal the Fourier equation&hellip;</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h4>Spectrum</h4><span class="tg">&#9660;</span></div>
+      <div class="panel-body"><canvas class="spec" id="specCanvas"></canvas></div>
+    </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- presets -->
+<div class="modal" id="presetModal">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)">
+      <div>
+        <h3 style="margin-bottom:4px">Shape Presets</h3>
+        <div style="color:var(--text-mute);font-size:11px">Verify Fourier area against the analytical formula</div>
+      </div>
+      <button class="mode-btn" id="presetClose">Close</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)">
+      <span style="color:var(--text-dim);font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-right:4px">Drawing tool</span>
+      <button class="mode-btn on" id="toolFreehand" title="Draw the outline freely with the mouse">Freehand</button>
+      <button class="mode-btn" id="toolBezier" aria-label="Bézier" title="Click: place anchor · Click-drag: pull curve handles · Click first anchor or Enter: close · L: switch next segment Line/Curve · Ctrl-click: place the other segment type · Alt-click segment: straight/curved · Double-click anchor: smooth/corner · Shift-click anchor: delete · Backspace: undo point">Bézier</button>
+      <button class="mode-btn" id="toolRect" title="Drag on the cell to draw a rectangle">Rect</button>
+      <button class="mode-btn" id="toolCircle" title="Drag on the cell to draw a circle">Circle</button>
+      <span style="color:var(--text-mute);font-size:11px">pick one, then draw on the cell</span>
+    </div>
+    <div id="presetGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px"></div>
+  </div>
+</div>
+
+<script src="session.js"></script>
+<script src="shared-store.js"></script>
+<script src="undo.js"></script>
+<script>
+"use strict";
+
+/* ================= saved results (CSV files) =================
+   Same block in editor.html, trace.html and results.html. server.py writes
+   every saved result into results/measurements.csv, results/circles.csv and
+   results/cell_areas.csv next to the app; GET api/download zips all three. */
+const ResultsCSV = {
+  async req(url, opts){
+    let r;
+    try{ r = await fetch(url, opts); }
+    catch(e){ throw new Error('the app server is not running — start the app with server.py (start-windows.bat)'); }
+    let j = null; try{ j = await r.json(); }catch(e){}
+    if(!r.ok){
+      if(r.status===404 || r.status===501) throw new Error('this server cannot save results — start the app with the included server.py');
+      throw new Error((j && j.error) || ('HTTP '+r.status));
+    }
+    return j;
+  },
+  save(payload){ return this.req('api/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}); },
+  get(path){ return this.req(path); },
+  saverName(ask){
+    if(window.Session && Session.user) return Session.user;   // logged in: always the login name
+    let n = '';
+    try{ n = localStorage.getItem('db-name') || ''; }catch(e){}
+    if(!n && ask){
+      n = (prompt('Your name — it is saved with your results:', '') || '').trim().slice(0,60);
+      if(n) try{ localStorage.setItem('db-name', n); }catch(e){}
+    }
+    if(!n) try{ n = localStorage.getItem('dash-user') || 'anonymous'; }catch(e){ n='anonymous'; }
+    return n;
+  }
+};
+/* small "💾 …" indicator next to the Save button */
+function dbIndicator(text, kind){
+  const el = document.getElementById('dbState'); if(!el) return;
+  el.textContent = text; el.className = 'db-state '+(kind||'');
+}
+function savedStamp(){ const t=new Date(); return '💾 saved to results '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'); }
+
+/* ================= pen (boundary colour + width) =================
+   Same block in editor.html and trace.html; the choice is stored in
+   localStorage so both pages draw with the same pen. Width is in screen
+   pixels, so the line looks the same at every zoom. */
+const PEN_COLORS = [['Red','#ff1f1f'],['Yellow','#ffd400'],['Blue','#1f5bff'],['Green','#00c853'],['Black','#000000'],['White','#ffffff']];
+const Pen = { color:'#ff1f1f', width:1.5 };
+try{
+  const c=localStorage.getItem('pen-color'), w=parseFloat(localStorage.getItem('pen-width'));
+  if(c && PEN_COLORS.some(x=>x[1]===c)) Pen.color=c;
+  if(w>=0.5 && w<=6) Pen.width=w;
+}catch(e){}
+function penRGBA(a){
+  const n=parseInt(Pen.color.slice(1),16);
+  return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';
+}
+/* little mark at a segment's middle while editing: bar = straight, dot = curve */
+function drawSegMark(ctx, s, isLine, u){
+  const m=bezPt(s,0.5), d=bezDeriv(s,0.5), L=Math.hypot(d[0],d[1])||1, nx=-d[1]/L, ny=d[0]/L, r=3.2*u;
+  ctx.save();
+  ctx.fillStyle=Pen.color; ctx.strokeStyle=Pen.color==='#000000'?'#ffffff':'#000000'; ctx.lineWidth=1*u;
+  ctx.beginPath();
+  if(isLine){ ctx.moveTo(m[0]-nx*r*1.6,m[1]-ny*r*1.6); ctx.lineTo(m[0]+nx*r*1.6,m[1]+ny*r*1.6); ctx.lineWidth=2.4*u; ctx.strokeStyle=Pen.color; ctx.stroke(); }
+  else{ ctx.arc(m[0],m[1],r,0,Math.PI*2); ctx.fill(); ctx.stroke(); }
+  ctx.restore();
+}
+function buildPenUI(onChange){
+  const box=document.getElementById('penBox'); if(!box) return;
+  box.innerHTML='<span class="pen-lbl">Pen</span>'+
+    PEN_COLORS.map(([n,c])=>'<button class="pen-sw" data-c="'+c+'" title="'+n+'" style="background:'+c+'"></button>').join('')+
+    '<input type="range" id="penW" min="0.5" max="6" step="0.5" title="Pen width (screen pixels)"><span class="pen-val" id="penWv"></span>';
+  const sync=()=>{
+    box.querySelectorAll('.pen-sw').forEach(b=>b.classList.toggle('on', b.dataset.c===Pen.color));
+    document.getElementById('penW').value=Pen.width;
+    document.getElementById('penWv').textContent=Pen.width+' px';
+  };
+  box.addEventListener('click', e=>{
+    const b=e.target.closest('.pen-sw'); if(!b) return;
+    Pen.color=b.dataset.c; try{ localStorage.setItem('pen-color',Pen.color); }catch(err){}
+    sync(); onChange();
+  });
+  document.getElementById('penW').addEventListener('input', e=>{
+    Pen.width=parseFloat(e.target.value); try{ localStorage.setItem('pen-width',String(Pen.width)); }catch(err){}
+    sync(); onChange();
+  });
+  sync();
+}
+
+const GRID = 16;
+const PATCHES = GRID * GRID;
+const DB_NAME = 'epicycle-dashboard';
+const DB_VER = 3;   // v3 adds the 'traces' store (trace.html)
+const STORE_FILES = 'files';
+const STORE_PATCH = 'patches';
+
+const S = {
+  db:null, files:[], current:-1, user:null, cell:-1,
+  edCanvas:null, edCtx:null, patchW:500, patchH:500,
+  zoom:1, baseSide:500, drawing:false, tool:'freehand',
+  currentPoints:[], shapeStart:null, lineStart:null, shiftHeld:false,
+  drawingPaused:false, lastEndPoint:null,
+  t:0, speed:1, showCircles:true, showArms:true, showTrail:true,
+  numCircles:200, trail:[], dpr:window.devicePixelRatio||1,
+  worker:null, scale:1, sortCol:'amp', sortDir:-1,
+  expectedArea:null,
+  bez:{nodes:[], closed:false}, bezDrag:null, bezSeg:'curve', bezHover:null,
+  panX:0, panY:0, follow:false, lastEv:null, glide:null, panDrag:null,
+  hand:false, spaceHeld:false        // move tool (✋ / H) and Space held: left-drag moves the view
+};
+
+const PRESETS = [
+  { id:'circle', name:'Circle', icon:'◯', formula:'r = a', areaFormula:'A = π·a²',
+    areaFn:p=>Math.PI*Math.pow(p*0.42,2), desc:'Perfect circle. ~0% error.',
+    gen:(W,H,pw)=>{const a=pw*0.42,ap=a/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=300;i++){const t=i/300*2*Math.PI;o.push([cx+ap*Math.cos(t),cy+ap*Math.sin(t)]);}return o;} },
+  { id:'cardioid', name:'Cardioid', icon:'❤️', formula:'r = a(1 + cos θ)', areaFormula:'A = (3/2)·π·a²',
+    areaFn:p=>1.5*Math.PI*Math.pow(p*0.38,2), desc:'Heart-shaped, single cusp.',
+    gen:(W,H,pw)=>{const a=pw*0.38,ap=a/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=400;i++){const t=i/400*2*Math.PI,r=ap*(1+Math.cos(t));
+        o.push([cx+r*Math.cos(t)-ap,cy+r*Math.sin(t)]);}return o;} },
+  { id:'ellipse', name:'Ellipse', icon:'⬭', formula:'x=a·cos t, y=b·sin t', areaFormula:'A = π·a·b',
+    areaFn:p=>Math.PI*(p*0.42)*(p*0.28), desc:'Stretched circle, no corners.',
+    gen:(W,H,pw)=>{const a=pw*0.42,b=pw*0.28,ap=a/(pw/W),bp=b/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=300;i++){const t=i/300*2*Math.PI;o.push([cx+ap*Math.cos(t),cy+bp*Math.sin(t)]);}return o;} },
+  { id:'lemniscate', name:'Lemniscate', icon:'∞', formula:'r² = a²·cos(2θ)', areaFormula:'A = a²',
+    areaFn:p=>Math.pow(p*0.42,2), desc:'Figure-eight, self-crossing.',
+    gen:(W,H,pw)=>{const a=pw*0.42,ap=a/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(const bs of[-Math.PI/4,3*Math.PI/4])
+        for(let i=0;i<=200;i++){const t=bs+(i/200)*(Math.PI/2),r2=ap*ap*Math.cos(2*t);
+          if(r2<0)continue;const r=Math.sqrt(r2);o.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);}
+      if(o.length)o.push(o[0].slice());return o;} },
+  { id:'rose3', name:'3-Petal Rose', icon:'🌸', formula:'r = a·cos(3θ)', areaFormula:'A = π·a²/4',
+    areaFn:p=>Math.PI*Math.pow(p*0.42,2)/4, desc:'Three petals.',
+    gen:(W,H,pw)=>{const a=pw*0.42,ap=a/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=300;i++){const t=i/300*Math.PI,r=ap*Math.cos(3*t);o.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);}return o;} },
+  { id:'rose4', name:'4-Petal Rose', icon:'🌺', formula:'r = a·cos(4θ)', areaFormula:'A = π·a²/4',
+    areaFn:p=>Math.PI*Math.pow(p*0.42,2)/4, desc:'Four petals.',
+    gen:(W,H,pw)=>{const a=pw*0.42,ap=a/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=400;i++){const t=i/400*Math.PI,r=ap*Math.cos(4*t);o.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);}return o;} },
+  { id:'rose5', name:'5-Petal Rose', icon:'🌷', formula:'r = a·cos(5θ)', areaFormula:'A = π·a²/4',
+    areaFn:p=>Math.PI*Math.pow(p*0.42,2)/4, desc:'Five petals.',
+    gen:(W,H,pw)=>{const a=pw*0.42,ap=a/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=400;i++){const t=i/400*Math.PI,r=ap*Math.cos(5*t);o.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);}return o;} },
+  { id:'square', name:'Square', icon:'□', formula:'side = s', areaFormula:'A = s²',
+    areaFn:p=>Math.pow(p*0.7,2), desc:'Tests Gibbs effect at corners.',
+    gen:(W,H,pw)=>{const s=pw*0.7,sp=s/(pw/W),cx=W/2,cy=H/2,h=sp/2;
+      return [[cx-h,cy-h],[cx+h,cy-h],[cx+h,cy+h],[cx-h,cy+h],[cx-h,cy-h]];} },
+  { id:'triangle_eq', name:'Equilateral Triangle', icon:'🔺', formula:'side = s', areaFormula:'A = (√3/4)·s²',
+    areaFn:p=>(Math.sqrt(3)/4)*Math.pow(p*0.7,2), desc:'Sharp corners test.',
+    gen:(W,H,pw)=>{const s=pw*0.7,sp=s/(pw/W),cx=W/2,cy=H/2,h=sp*Math.sqrt(3)/2;
+      return [[cx,cy-2*h/3],[cx-sp/2,cy+h/3],[cx+sp/2,cy+h/3],[cx,cy-2*h/3]];} },
+  { id:'star5', name:'5-Point Star', icon:'⭐', formula:'outer=R, inner=r', areaFormula:'A = 5·R·r·sin(36°)',
+    areaFn:p=>{const R=p*0.42,r=R*0.4;return 5*R*r*Math.sin(36*Math.PI/180);},
+    desc:'Ten corners, extreme Gibbs.',
+    gen:(W,H,pw)=>{const R=pw*0.42,r=R*0.4,Rp=R/(pw/W),rp=r/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=10;i++){const ang=i/10*2*Math.PI-Math.PI/2,rad=(i%2===0)?Rp:rp;
+        o.push([cx+rad*Math.cos(ang),cy+rad*Math.sin(ang)]);}return o;} },
+  // area is 2πa² — the original app shipped 12πa², a 4x-too-large constant.
+  { id:'nephroid', name:'Nephroid', icon:'🫘', formula:'x=a(3cos t - cos 3t)/2', areaFormula:'A = 2·π·a²',
+    areaFn:p=>2*Math.PI*Math.pow(p*0.12,2), desc:'Two-cusped epicycloid.',
+    gen:(W,H,pw)=>{const a=pw*0.12,ap=a/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=400;i++){const t=i/400*2*Math.PI;
+        o.push([cx+ap*(3*Math.cos(t)-Math.cos(3*t))/2,cy+ap*(3*Math.sin(t)-Math.sin(3*t))/2]);}return o;} },
+  { id:'astroid', name:'Astroid', icon:'✦', formula:'x=a·cos³t, y=a·sin³t', areaFormula:'A = (3/8)·π·a²',
+    areaFn:p=>0.375*Math.PI*Math.pow(p*0.42,2), desc:'Four-cusped hypocycloid.',
+    gen:(W,H,pw)=>{const a=pw*0.42,ap=a/(pw/W),cx=W/2,cy=H/2,o=[];
+      for(let i=0;i<=400;i++){const t=i/400*2*Math.PI;
+        o.push([cx+ap*Math.pow(Math.cos(t),3),cy+ap*Math.pow(Math.sin(t),3)]);}return o;} }
+];
+
+const WORKER_CODE = `
+function arcLen(pts){
+  const n=pts.length, cum=new Float64Array(n+1);
+  for(let i=0;i<n;i++){const j=(i+1)%n;cum[i+1]=cum[i]+Math.hypot(pts[j][0]-pts[i][0],pts[j][1]-pts[i][1]);}
+  const tot=cum[n];if(tot<1e-12)return null;
+  for(let i=0;i<=n;i++)cum[i]/=tot;return cum;
+}
+function exactFourier(pts,t,K){
+  const V=pts.length;const slopes=[];
+  for(let j=0;j<V;j++){const nj=(j+1)%V,dt=t[j+1]-t[j];slopes.push(dt>1e-15?[(pts[nj][0]-pts[j][0])/dt,(pts[nj][1]-pts[j][1])/dt]:[0,0]);}
+  let c0r=0,c0i=0;
+  for(let j=0;j<V;j++){const dt=t[j+1]-t[j];c0r+=dt*(pts[j][0]+pts[(j+1)%V][0])/2;c0i+=dt*(pts[j][1]+pts[(j+1)%V][1])/2;}
+  const coeffs=[{k:0,re:c0r,im:c0i,amp:Math.hypot(c0r,c0i),phase:Math.atan2(c0i,c0r)}];
+  for(let ki=1;ki<=K;ki++){
+    for(const s of[-1,1]){
+      const k=ki*s,w=2*Math.PI*k,w2=w*w;let sr=0,si=0;
+      for(let j=0;j<V;j++){
+        const dt=t[j+1]-t[j];if(dt<1e-15)continue;
+        const a1=-w*t[j+1],a2=-w*t[j];
+        const dr=Math.cos(a1)-Math.cos(a2),di=Math.sin(a1)-Math.sin(a2);
+        sr+=slopes[j][0]*dr-slopes[j][1]*di;si+=slopes[j][0]*di+slopes[j][1]*dr;
+      }
+      const re=sr/w2,im=si/w2;
+      coeffs.push({k,re,im,amp:Math.hypot(re,im),phase:Math.atan2(im,re)});
+    }
+  }
+  return coeffs;
+}
+function shoelace(pts){let a=0;const n=pts.length;for(let i=0;i<n;i++){const j=(i+1)%n;a+=pts[i][0]*pts[j][1]-pts[j][0]*pts[i][1];}return Math.abs(a/2);}
+function perim(pts){let p=0;const n=pts.length;for(let i=0;i<n;i++){const j=(i+1)%n;p+=Math.hypot(pts[j][0]-pts[i][0],pts[j][1]-pts[i][1]);}return p;}
+self.onmessage=function(e){
+  const{pts,K,numCircles,key}=e.data;
+  try{
+    if(!pts||pts.length<3){self.postMessage({key,error:'Need 3+ points'});return;}
+    let cx=0,cy=0;for(const pt of pts){cx+=pt[0];cy+=pt[1];}cx/=pts.length;cy/=pts.length;
+    const centered=pts.map(pt=>[pt[0]-cx,pt[1]-cy]);
+    const t=arcLen(centered);if(!t){self.postMessage({key,error:'Zero-length'});return;}
+    const coeffs=exactFourier(centered,t,K);
+    coeffs.sort((a,b)=>b.amp-a.amp);
+    const active=coeffs.slice(0,numCircles);
+    const fArea=Math.abs(Math.PI*active.reduce((s,c)=>s+c.k*c.amp*c.amp,0));
+    const sArea=shoelace(centered);const p=perim(centered);
+    let minX=1e18,maxX=-1e18,minY=1e18,maxY=-1e18;
+    for(const pt of centered){if(pt[0]<minX)minX=pt[0];if(pt[0]>maxX)maxX=pt[0];if(pt[1]<minY)minY=pt[1];if(pt[1]>maxY)maxY=pt[1];}
+    let a=0;const n=centered.length;
+    for(let i=0;i<n;i++){const j=(i+1)%n;a+=centered[i][0]*centered[j][1]-centered[j][0]*centered[i][1];}
+    const dir=(a/2)>0?'CCW':'CW';
+    const NS=400;
+    const rx=new Float64Array(NS), ry=new Float64Array(NS);
+    for(let j=0;j<NS;j++){
+      const tt=j/NS; let sx=0,sy=0;
+      for(const c of active){const ang=2*Math.PI*c.k*tt+c.phase;sx+=c.amp*Math.cos(ang);sy+=c.amp*Math.sin(ang);}
+      rx[j]=sx; ry[j]=sy;
+    }
+    let sumErr=0;
+    for(let i=0;i<centered.length;i++){
+      let minD=1e18;
+      for(let j=0;j<NS;j++){
+        const dx=centered[i][0]-rx[j], dy=centered[i][1]-ry[j];
+        const d=dx*dx+dy*dy; if(d<minD)minD=d;
+      }
+      sumErr+=Math.sqrt(minD);
+    }
+    const meanErr=sumErr/centered.length;
+    const tableData=active.map((c,i)=>({rank:i+1,k:c.k,amp:c.amp,phase:c.phase,phaseDeg:c.phase*180/Math.PI,cumArea:0}));
+    let cumSum=0;
+    for(let i=0;i<tableData.length;i++){
+      cumSum+=tableData[i].k*tableData[i].amp*tableData[i].amp;
+      tableData[i].cumArea=Math.abs(Math.PI*cumSum);
+    }
+    self.postMessage({key,coeffs:active,active,fArea,sArea,perim:p,w:maxX-minX,h:maxY-minY,
+      meanErr,centroid:[cx,cy],dir,tableData});
+  }catch(err){self.postMessage({key,error:err.message});}
+};
+`;
+
+/* ---- storage (shared with dashboard-front.html and sector-map-matrix.html) ---- */
+function openDB(){
+  return new Promise((res,rej)=>{
+    let r;
+    try{ r = indexedDB.open(DB_NAME, DB_VER); }catch(err){ rej(err); return; }
+    r.onupgradeneeded = e => {
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(STORE_FILES)) db.createObjectStore(STORE_FILES,{keyPath:'id'});
+      if(!db.objectStoreNames.contains(STORE_PATCH)) db.createObjectStore(STORE_PATCH,{keyPath:'fileId'});
+      if(!db.objectStoreNames.contains('traces')) db.createObjectStore('traces',{keyPath:'fileId'});
+    };
+    r.onsuccess = e => { const db=e.target.result; db.onversionchange=()=>db.close(); res(db); };
+    r.onerror   = e => rej(e.target.error);
+    r.onblocked = () => rej(new Error('database upgrade blocked by another open tab'));
+    setTimeout(()=>rej(new Error('database open timed out')), 4000);
+  });
+}
+// IndexedDB; shared-store.js sends the same calls to the server so all users share them
+const storeReq = SharedStore.wrap(localStoreReq);
+function localStoreReq(name, mode, method, arg){
+  return new Promise((res,rej)=>{
+    let r;
+    try{
+      const os = S.db.transaction(name, mode).objectStore(name);
+      r = arg === undefined ? os[method]() : os[method](arg);
+    }catch(err){ rej(err); return; }
+    r.onsuccess = () => res(r.result);
+    r.onerror   = () => rej(r.error);
+  });
+}
+const dbAllFiles   = ()   => storeReq(STORE_FILES,'readonly','getAll');
+const dbPutFile    = f    => storeReq(STORE_FILES,'readwrite','put', f);
+const dbPutPatches = rec  => storeReq(STORE_PATCH,'readwrite','put', rec);
+const dbGetPatches = id   => storeReq(STORE_PATCH,'readonly','get', id);
+const dbGetFile    = id   => storeReq(STORE_FILES,'readonly','get', id);
+
+/* The image list (names and dates only: one small request) plus the full data
+   — pixels and cell drawings — of just the image being opened. Loading every
+   image's drawings on every page open was what made switching slow. */
+async function loadFiles(wantId){
+  const list = (await Episodes.scoped(await SharedStore.list(localStoreReq))).filter(r => r && r.id && r.name);
+  const files = list.map(rec => ({
+    id: rec.id, name: rec.name, blob: null,
+    createdAt: rec.createdAt || Date.now(),
+    rows: rec.rows || GRID, cols: rec.cols || GRID,
+    patchW: rec.patchW || 3.4, patchH: rec.patchH || 3.4, unit: rec.unit || 'cm',
+    uploadedBy: rec.uploadedBy || null, uploadedAt: rec.uploadedAt || null,
+    editedAreas: rec.editedAreas || null,
+    patches: Array.from({length: PATCHES}, emptyPatch)
+  })).sort((a,b)=>Episodes.context ? 0 : b.createdAt-a.createdAt);
+  const f = files.find(x => x.id === wantId) || files[0];
+  if(f){
+    f.loaded = true;
+    const [rec, pr] = await Promise.all([ dbGetFile(f.id).catch(()=>null), dbGetPatches(f.id).catch(()=>null) ]);
+    if(rec && rec.blob) f.blob = rec.blob;
+    if(pr && Array.isArray(pr.patches)){
+      for(let i=0;i<Math.min(PATCHES, pr.patches.length);i++){
+        if(pr.patches[i]) f.patches[i] = Object.assign(emptyPatch(), pr.patches[i]);
+      }
+    }
+  }
+  return files;
+}
+
+function fileRecord(f){
+  return { id:f.id, name:f.name, blob:f.blob, createdAt:f.createdAt,
+           rows:f.rows, cols:f.cols, patchW:f.patchW, patchH:f.patchH, unit:f.unit,
+           uploadedBy:f.uploadedBy||null, uploadedAt:f.uploadedAt||null, editedAreas:f.editedAreas||null };
+}
+/* Areas of cells measured from the user's own outline (drawn or corrected here,
+   not the piece written by the trace page): {index: {area, by}} in the file's
+   unit². Kept on the small file record so the trace page can show corrections
+   without downloading every cell. */
+function computeEditedAreas(f){
+  const out = {};
+  f.patches.forEach((p,i) => {
+    if(p && !p.fromTrace && p.measurements && p.active && p.active.length){
+      const m = p.measurements;
+      out[i] = { area: m.bArea!==undefined ? m.bArea : m.sArea, by: p.editedBy || null };
+    }
+  });
+  return out;
+}
+/* Patch measurements live in their own store, so writing them can never clobber
+   the file record (name + image blob). */
+async function savePatches(f, idx){
+  // every save here follows a change to a cell (the open one unless given): record who made it
+  if(idx === undefined) idx = S.cell;
+  if(idx >= 0 && f.patches[idx]) Session.stamp(f.patches[idx]);
+  f.editedAreas = computeEditedAreas(f);
+  try{
+    await dbPutPatches({ fileId: f.id, patches: f.patches, savedAt: Date.now(), savedBy: S.user });
+    await dbPutFile(fileRecord(f));
+  }catch(err){ setStatus('Save failed: '+err.message,'err'); }
+}
+
+function $(id){ return document.getElementById(id); }
+function num(n,d){ return (Math.round(n*Math.pow(10,d))/Math.pow(10,d)).toString(); }
+function emptyPatch(){ return {points:null,coeffs:null,active:null,centroid:null,tableData:null,measurements:null,marked:false}; }
+function isDone(p){ return !!(p && p.active && p.active.length); }
+function coordOf(i){ return Math.floor(i/GRID) + ',' + (i%GRID); }
+function measuredCount(f){ let n=0; for(let i=0;i<f.patches.length;i++) if(isDone(f.patches[i])) n++; return n; }
+function fileNow(){ return S.current>=0 ? S.files[S.current] : null; }
+function patchOf(f,i){ if(!f.patches[i]) f.patches[i]=emptyPatch(); return f.patches[i]; }
+
+function fileBitmap(f, onReady){
+  if(!f || !f.blob){ onReady(null); return; }
+  if(f._bmp){ onReady(f._bmp); return; }
+  f._pending = f._pending || [];
+  f._pending.push(onReady);
+  if(f._loading) return;
+  f._loading = true;
+  createImageBitmap(f.blob).then(bmp=>{
+    f._bmp = bmp;
+    const q = f._pending || []; f._pending = [];
+    q.forEach(fn => fn(bmp));
+  }).catch(()=>{
+    const q = f._pending || []; f._pending = [];
+    q.forEach(fn => fn(null));
+  });
+}
+
+/* ================= navigation ================= */
+function param(name){
+  const v = new URLSearchParams(location.search).get(name);
+  return (v === null || v === '') ? null : v;
+}
+function editorURL(id, idx){
+  return Episodes.link('editor.html?f=' + encodeURIComponent(id) + '&c=' + idx);
+}
+function matrixURL(id){
+  return Episodes.link('sector-map-matrix.html?f=' + encodeURIComponent(id));
+}
+function goMatrix(idx){
+  const f = fileNow(); if(!f) return;
+  if(typeof idx === 'number' && idx >= 0 && idx < PATCHES){
+    localStorage.setItem('ed-cell', String(idx));
+    location.href = matrixURL(f.id);
+  }else{
+    localStorage.setItem('ed-cell', '-1');
+    location.href = matrixURL(f.id);
+  }
+}
+function step(delta){
+  const f = fileNow(); if(!f || S.cell < 0) return;
+  const next = S.cell + delta;
+  if(next < 0 || next >= PATCHES){ setStatus(delta < 0 ? 'This is the first cell' : 'This is the last cell', 'cont'); return; }
+  goCell(next);
+}
+/* Switch cell inside the page: the image and all its cells are already loaded,
+   so nothing is downloaded. The address bar follows, so Back / reload still work. */
+function goCell(idx){
+  const f = fileNow(); if(!f || S.drawing || idx === S.cell) return;
+  history.pushState({ c: idx }, '', editorURL(f.id, idx));
+  localStorage.setItem('ed-cell', String(idx));
+  openCell(idx);
+}
+window.addEventListener('popstate', () => {
+  const f = fileNow(), c = parseInt(param('c'), 10);
+  if(f && param('f') === f.id && c >= 0 && c < PATCHES) openCell(c);
+  else location.reload();   // went back to another image
+});
+/* Previous / next image ([ and ]), same cell, in dashboard order (newest first). */
+function stepImage(delta){
+  const f = fileNow(); if(!f) return;
+  const list = S.files.slice().sort((a,b)=>Episodes.context ? 0 : b.createdAt-a.createdAt);
+  const n = list[list.findIndex(x=>x.id===f.id) + delta];
+  if(!n){ setStatus(delta < 0 ? 'This is the first image' : 'This is the last image', 'cont'); return; }
+  location.href = editorURL(n.id, Math.max(0, S.cell));
+}
+
+/* ================= editor ================= */
+function setStatus(msg,type){ const el=$('patchStatus'); el.textContent=msg; el.className='status '+(type||''); }
+function updateZoomLabel(){ $('zoomLabel').textContent = Math.round(S.zoom*100)+'%'; }
+function clampPt(p){ return [Math.max(0,Math.min(S.patchW,p[0])),Math.max(0,Math.min(S.patchH,p[1]))]; }
+/* The canvas keeps a fixed 500x500 logical space (patch pixel coordinates) and is
+   only scaled for display, so pointer coords must be mapped back through the
+   displayed size.
+   Pointer positions are integers (clientX/clientY are longs), and the canvas
+   edge usually lands on a fractional device pixel, so the reachable positions
+   are ceil(left) .. floor(left+width) -- one short of the full span. Mapping
+   that integer span onto 0..patchW makes the outermost reachable pixel land
+   exactly on the patch edge, so a shape drawn to the visible border covers the
+   whole patch. The canvas has no CSS border (box-shadow instead), so
+   getBoundingClientRect() is exactly the content box. */
+function screenToCanvas(e){
+  const r = S.edCanvas.getBoundingClientRect();
+  const x0 = Math.ceil(r.left),  x1 = Math.floor(r.left + r.width);
+  const y0 = Math.ceil(r.top),   y1 = Math.floor(r.top + r.height);
+  const kx = S.patchW / Math.max(1, x1 - x0);
+  const ky = S.patchH / Math.max(1, y1 - y0);
+  return [(e.clientX - x0) * kx, (e.clientY - y0) * ky];
+}
+/* Edge snap: a pointer within EDGE_SNAP_PX screen pixels of a patch edge lands
+   exactly on it. One screen pixel is ~1 patch pixel (~0.007 cm at 3.4 cm/500 px),
+   so stopping the mouse a hair short of the border used to cost a whole row of
+   area (e.g. 3.4 x 3.3859 = 11.512 instead of 11.56). */
+const EDGE_SNAP_PX = 8;
+function snapEdge(p){
+  const t = EDGE_SNAP_PX * unitsPerCssPx();
+  const s = v => v < t ? 0 : v;
+  const e = (v, m) => v > m - t ? m : v;
+  return [e(s(p[0]), S.patchW), e(s(p[1]), S.patchH)];
+}
+function pointerPt(e){ return snapEdge(clampPt(screenToCanvas(e))); }
+function setTool(t){
+  S.tool = t;
+  ['toolFreehand','toolRect','toolCircle','toolBezier'].forEach(id => $(id).classList.remove('on'));
+  const map = {freehand:'toolFreehand', rect:'toolRect', circle:'toolCircle', bezier:'toolBezier'};
+  const b = $(map[t]); if(b) b.classList.add('on');
+  // the drawing tools live in the Presets window: show the chosen one on its button
+  $('btnPresets').textContent = 'Presets · ' + {freehand:'Freehand', rect:'Rect', circle:'Circle', bezier:'Bézier'}[t];
+  $('btnSegMode').style.display = t==='bezier' ? 'inline-block' : 'none';
+  if(t==='bezier' && S.cell>=0){
+    S.drawingPaused=false; S.lastEndPoint=null;
+    if(!S.bez.nodes.length) setStatus('Bézier: click to place anchors · L switches the next segment between Line and Curve · click the first anchor to close','cont');
+  }
+  if(S.edCanvas){ updateContinueUI(); renderEditor(); }
+}
+
+/* ================= Bézier tool =================
+   A closed path of cubic Bézier segments. Each node holds an anchor p and two
+   handles hi (incoming) / ho (outgoing), all in patch pixel coordinates.
+   mode 'auto'   -> handles derived from neighbours (Catmull-Rom), always smooth
+   mode 'smooth' -> user-set handles, kept collinear when one is dragged
+   mode 'corner' -> handles collapsed onto the anchor (sharp vertex)
+   Segments are typed independently of nodes: node.line = true makes the segment
+   from that node to the next one an exact straight line (both inner handles sit
+   on the anchors), so one outline can mix straight edges and curves.
+   Every control point is clamped to the patch, and a cubic segment lies inside
+   the convex hull of its control points, so the curve never leaves the patch.
+
+   Area is exact: by Green's theorem A = 1/2 ∮ (x dy - y dx). On a cubic segment
+   x·y' - y·x' is a degree-5 polynomial in t, which 3-point Gauss-Legendre
+   integrates exactly, so the only error is floating-point rounding. */
+const BEZ_SAMPLES = 128;          // samples per segment fed to Fourier/shoelace
+const GL3 = [[0.5-Math.sqrt(15)/10, 5/18],[0.5, 8/18],[0.5+Math.sqrt(15)/10, 5/18]];
+
+function bezCopy(nodes){ return nodes.map(n=>({p:n.p.slice(),hi:n.hi.slice(),ho:n.ho.slice(),mode:n.mode,line:!!n.line})); }
+function bezSegs(nodes, closed){
+  const segs=[], n=nodes.length;
+  for(let i=0;i<(closed?n:n-1);i++){ const a=nodes[i], b=nodes[(i+1)%n]; segs.push([a.p,a.ho,b.hi,b.p]); }
+  return segs;
+}
+function bezPt(s,t){
+  const u=1-t, a=u*u*u, b=3*u*u*t, c=3*u*t*t, d=t*t*t;
+  return [a*s[0][0]+b*s[1][0]+c*s[2][0]+d*s[3][0], a*s[0][1]+b*s[1][1]+c*s[2][1]+d*s[3][1]];
+}
+function bezDeriv(s,t){
+  const u=1-t, a=3*u*u, b=6*u*t, c=3*t*t;
+  return [a*(s[1][0]-s[0][0])+b*(s[2][0]-s[1][0])+c*(s[3][0]-s[2][0]),
+          a*(s[1][1]-s[0][1])+b*(s[2][1]-s[1][1])+c*(s[3][1]-s[2][1])];
+}
+/* Signed area of the closed path in px² (positive = clockwise on screen). */
+function bezSignedArea(nodes){
+  let A=0;
+  for(const s of bezSegs(nodes,true)){
+    for(const [t,w] of GL3){ const p=bezPt(s,t), d=bezDeriv(s,t); A += w*(p[0]*d[1]-p[1]*d[0]); }
+  }
+  return A/2;
+}
+function bezArea(nodes){ return Math.abs(bezSignedArea(nodes)); }
+/* Arc length by 16-point-per-segment Gauss-Legendre on |B'(t)| (subdivided). */
+function bezLength(nodes, closed){
+  let L=0; const SUB=8;
+  for(const s of bezSegs(nodes,closed)){
+    for(let k=0;k<SUB;k++){
+      for(const [t,w] of GL3){ const d=bezDeriv(s,(k+t)/SUB); L += w*Math.hypot(d[0],d[1])/SUB; }
+    }
+  }
+  return L;
+}
+function bezSample(nodes, closed){
+  const out=[];
+  for(const s of bezSegs(nodes,closed)) for(let i=0;i<BEZ_SAMPLES;i++) out.push(bezPt(s,i/BEZ_SAMPLES));
+  if(!closed && nodes.length) out.push(nodes[nodes.length-1].p.slice());
+  return out;
+}
+/* Is segment i (node i -> node i+1) present and straight? */
+function bezSegIsLine(i){
+  const N=S.bez.nodes, n=N.length;
+  if(n<2) return false;
+  if(S.bez.closed) i=(i+n)%n; else if(i<0 || i>=n-1) return false;
+  return !!N[i].line;
+}
+/* Recompute handles: 'auto' nodes from their neighbours, then collapse every
+   handle that belongs to a straight segment. An auto node joining a straight
+   segment to a curved one sends the curve off along the line's direction, so a
+   straight edge flows into a curve without a kink. */
+function bezAutoHandles(){
+  const N=S.bez.nodes, n=N.length, closed=S.bez.closed;
+  for(let i=0;i<n;i++){
+    const nd=N[i];
+    const inL = (closed || i>0) && bezSegIsLine(i-1);
+    const outL = (closed || i<n-1) && bezSegIsLine(i);
+    if(nd.mode==='corner'){ nd.hi=nd.p.slice(); nd.ho=nd.p.slice(); continue; }
+    if(nd.mode==='auto'){
+      const prev = (i>0) ? N[i-1].p : (closed ? N[n-1].p : nd.p);
+      const next = (i<n-1) ? N[i+1].p : (closed ? N[0].p : nd.p);
+      const lp=Math.hypot(nd.p[0]-prev[0],nd.p[1]-prev[1]), ln=Math.hypot(next[0]-nd.p[0],next[1]-nd.p[1]);
+      // line->curve joint: follow the line if it carries on in roughly the same
+      // direction (< 35°), otherwise treat it as a corner and aim along the curve's
+      // own chord, so a real corner never gets a hook
+      const SMOOTH_JOIN = Math.cos(35*Math.PI/180);
+      if(inL && !outL && lp>1e-9 && ln>1e-9){
+        const ux=(nd.p[0]-prev[0])/lp, uy=(nd.p[1]-prev[1])/lp;
+        const vx=(next[0]-nd.p[0])/ln, vy=(next[1]-nd.p[1])/ln;
+        const [dx,dy] = (ux*vx+uy*vy > SMOOTH_JOIN) ? [ux,uy] : [vx,vy];
+        nd.ho=clampPt([nd.p[0]+dx*ln/3, nd.p[1]+dy*ln/3]);
+      }else if(outL && !inL && lp>1e-9 && ln>1e-9){
+        const ux=(next[0]-nd.p[0])/ln, uy=(next[1]-nd.p[1])/ln;
+        const vx=(nd.p[0]-prev[0])/lp, vy=(nd.p[1]-prev[1])/lp;
+        const [dx,dy] = (ux*vx+uy*vy > SMOOTH_JOIN) ? [ux,uy] : [vx,vy];
+        nd.hi=clampPt([nd.p[0]-dx*lp/3, nd.p[1]-dy*lp/3]);
+      }else{
+        const dx=(next[0]-prev[0])/6, dy=(next[1]-prev[1])/6;
+        nd.ho=clampPt([nd.p[0]+dx, nd.p[1]+dy]);
+        nd.hi=clampPt([nd.p[0]-dx, nd.p[1]-dy]);
+      }
+    }
+    if(inL) nd.hi=nd.p.slice();
+    if(outL) nd.ho=nd.p.slice();
+  }
+}
+/* Index of the segment passing within the hit radius of p, or -1. */
+function bezHitSeg(p){
+  const R=8*unitsPerCssPx(); let best=-1, bd=R;
+  bezSegs(S.bez.nodes,S.bez.closed).forEach((s,i)=>{
+    let a=bezPt(s,0);
+    for(let k=1;k<=32;k++){
+      const b=bezPt(s,k/32), vx=b[0]-a[0], vy=b[1]-a[1], L2=vx*vx+vy*vy;
+      const t=L2>0?Math.max(0,Math.min(1,((p[0]-a[0])*vx+(p[1]-a[1])*vy)/L2)):0;
+      const d=Math.hypot(p[0]-a[0]-t*vx, p[1]-a[1]-t*vy);
+      if(d<bd){ bd=d; best=i; }
+      a=b;
+    }
+  });
+  return best;
+}
+function bezToggleSeg(i){
+  const N=S.bez.nodes, n=N.length; if(i<0 || !N[i]) return;
+  N[i].line=!N[i].line;
+  if(!N[i].line){
+    // back to a curve: endpoints whose handles were collapsed by the line get auto handles
+    for(const nd of [N[i], N[(i+1)%n]]) if(nd.mode==='smooth') nd.mode='auto';
+  }
+  bezAutoHandles();
+  if(S.bez.closed) bezCommit();
+  setStatus('Segment '+(i+1)+' is now '+(N[i].line?'a straight line':'a curve'),'cont');
+  renderEditor();
+}
+function bezSetSegMode(m){
+  S.bezSeg=m;
+  const b=$('btnSegMode');
+  b.textContent='Next: '+(m==='line'?'Line':'Curve');
+  b.classList.toggle('on2', m==='curve'); b.classList.toggle('warn', m==='line');
+  renderEditor();
+}
+/* Canvas units per CSS pixel, so hit radii and marker sizes stay constant on screen. */
+function unitsPerCssPx(){
+  const r=S.edCanvas.getBoundingClientRect();
+  return r.width ? S.patchW/r.width : 1;
+}
+function bezHit(p){
+  const R=10*unitsPerCssPx(), N=S.bez.nodes;
+  // handles first (they sit on top), then anchors
+  for(let i=N.length-1;i>=0;i--){
+    const nd=N[i]; if(nd.mode==='corner') continue;
+    if(Math.hypot(p[0]-nd.ho[0],p[1]-nd.ho[1])<R && Math.hypot(nd.ho[0]-nd.p[0],nd.ho[1]-nd.p[1])>0.5) return {i,part:'ho'};
+    if(Math.hypot(p[0]-nd.hi[0],p[1]-nd.hi[1])<R && Math.hypot(nd.hi[0]-nd.p[0],nd.hi[1]-nd.p[1])>0.5) return {i,part:'hi'};
+  }
+  for(let i=N.length-1;i>=0;i--){
+    if(Math.hypot(p[0]-N[i].p[0],p[1]-N[i].p[1])<R) return {i,part:'p'};
+  }
+  return null;
+}
+function bezReset(){ S.bez={nodes:[],closed:false}; S.bezDrag=null; }
+function bezLoad(p){
+  if(p && p.bezier && p.bezier.nodes && p.bezier.nodes.length>=3) S.bez={nodes:bezCopy(p.bezier.nodes), closed:true};
+  else bezReset();
+  S.bezDrag=null;
+}
+function bezShowLive(){
+  const f=fileNow(); if(!f) return;
+  if(S.bez.closed && S.bez.nodes.length>=3){
+    const sc=f.patchW/S.patchW;
+    $('rowBez').classList.remove('hide');
+    $('rAreaB').textContent = num(bezArea(S.bez.nodes)*sc*sc,4)+' '+f.unit+'²';
+  }else{
+    $('rowBez').classList.add('hide');
+  }
+}
+function resetResultsUI(){
+  ['rCX','rCY','rCP','rArea','rAreaF','rPerim','rSize','rDir','rErr'].forEach(id=>$(id).textContent='—');
+  $('rowErr').classList.add('hide');
+  $('eqBox').textContent='Compute epicycles to reveal the Fourier equation…';
+  $('circleTableBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--text-mute)">Compute to see circle data</td></tr>';
+}
+/* Write the closed curve into the patch: exact control points in p.bezier, a dense
+   sampling in p.points (what COMPUTE, the matrix thumbnails and exports use).
+   Any earlier Fourier result no longer matches the shape, so it is discarded. */
+function bezCommit(){
+  const f=fileNow(); if(!f || !S.bez.closed || S.bez.nodes.length<3) return;
+  const p=patchOf(f,S.cell);
+  p.bezier={nodes:bezCopy(S.bez.nodes)};
+  p.fromTrace=false;
+  p.points=bezSample(S.bez.nodes,true);
+  p.coeffs=null; p.active=null; p.centroid=null; p.tableData=null; p.measurements=null; p.marked=false;
+  S.currentPoints=[]; S.t=0; S.trail=[]; S.expectedArea=null;
+  $('rowExp').classList.add('hide');
+  resetResultsUI(); bezShowLive();
+  const sc=f.patchW/S.patchW;
+  setStatus('✓ Closed Bézier ('+S.bez.nodes.length+' anchors) · area '+num(bezArea(S.bez.nodes)*sc*sc,4)+' '+f.unit+'² — click COMPUTE for Fourier','ok');
+  savePatches(f); refreshProgress();
+}
+/* ---- Edit Outline: correct a cell's existing outline (e.g. traced on the whole image) ----
+   The outline is a polygon (the trace page writes each cell's clipped piece as
+   points). It is thinned with Ramer–Douglas–Peucker (1 px tolerance), then
+   turned into Bézier anchors: stretches running along the cell border become
+   straight segments (exact), everything else becomes smooth curves through the
+   anchors. The user then drags / adds / deletes anchors as with any Bézier. */
+function rdp(pts, eps){
+  if(pts.length < 3) return pts.slice();
+  const a = pts[0], b = pts[pts.length-1];
+  let best = -1, dmax = 0;
+  const vx = b[0]-a[0], vy = b[1]-a[1], L = Math.hypot(vx, vy);
+  for(let i=1;i<pts.length-1;i++){
+    const d = L > 1e-9 ? Math.abs(vy*(pts[i][0]-a[0]) - vx*(pts[i][1]-a[1]))/L : Math.hypot(pts[i][0]-a[0], pts[i][1]-a[1]);
+    if(d > dmax){ dmax = d; best = i; }
+  }
+  if(dmax <= eps) return [a, b];
+  const left = rdp(pts.slice(0, best+1), eps), right = rdp(pts.slice(best), eps);
+  return left.slice(0, -1).concat(right);
+}
+function outlineToNodes(points){
+  const W = S.patchW, H = S.patchH, e = 0.5;
+  // drop repeated points and the closing duplicate
+  let pts = [];
+  for(const q of points){ const l = pts[pts.length-1]; if(!l || Math.hypot(q[0]-l[0], q[1]-l[1]) > 1e-6) pts.push([q[0], q[1]]); }
+  if(pts.length > 2 && Math.hypot(pts[0][0]-pts[pts.length-1][0], pts[0][1]-pts[pts.length-1][1]) < 1e-6) pts.pop();
+  if(pts.length < 3) return null;
+  // thin it (closed: run over the loop and back to the start)
+  pts = rdp(pts.concat([pts[0]]), 1.0); pts.pop();
+  if(pts.length < 3) return null;
+  const border = (q) => ({ l:q[0]<=e, r:q[0]>=W-e, t:q[1]<=e, b:q[1]>=H-e });
+  const sameBorder = (p, q) => { const a = border(p), c = border(q); return (a.l&&c.l)||(a.r&&c.r)||(a.t&&c.t)||(a.b&&c.b); };
+  const nodes = pts.map(q => ({ p:q.slice(), hi:q.slice(), ho:q.slice(), mode:'auto', line:false }));
+  for(let i=0;i<pts.length;i++){
+    const j = (i+1) % pts.length;
+    if(sameBorder(pts[i], pts[j])) nodes[i].line = true;           // along the cell edge: stays exact
+    if(border(pts[i]).l||border(pts[i]).r||border(pts[i]).t||border(pts[i]).b) nodes[i].mode = 'corner';   // where the outline meets the edge
+  }
+  return nodes;
+}
+function editOutline(){
+  const f = fileNow(); if(!f || S.cell < 0) return;
+  const p = patchOf(f, S.cell);
+  if(S.bez.closed && S.bez.nodes.length >= 3){ setTool('bezier'); setStatus('This outline is already editable: drag its anchors','cont'); return; }
+  if(!p.points || p.points.length < 3){ setStatus('This cell has no outline to edit yet — trace it on the Trace page or draw one here','err'); return; }
+  const nodes = outlineToNodes(p.points);
+  if(!nodes){ setStatus('This outline is too small to edit','err'); return; }
+  History.checkpoint();
+  const wasTrace = !!p.fromTrace;
+  setTool('bezier');
+  S.bez = { nodes, closed:true }; S.bezDrag = null;
+  bezAutoHandles(); bezCommit(); updateContinueUI(); renderEditor();
+  $('btnEditOutline').disabled = true;   // it is an editable Bézier now
+  computePatch();   // re-measure right away so the cell stays measured
+  setStatus('✎ '+nodes.length+' anchors — drag them onto the true boundary, double-click = corner, Alt-click a segment = straight / curve. '+
+            (wasTrace ? 'Your corrected area replaces the traced one on the Trace page.' : ''), 'cont');
+}
+
+function bezClose(){
+  if(S.bez.nodes.length<3){ setStatus('Bézier needs 3+ anchors','err'); return; }
+  S.bez.nodes[S.bez.nodes.length-1].line = S.bezSeg==='line';   // closing segment
+  S.bez.closed=true; S.bezHover=null; bezAutoHandles(); bezCommit(); updateContinueUI(); renderEditor();
+}
+function bezUndoPoint(){
+  if(S.bez.closed || !S.bez.nodes.length) return;
+  S.bez.nodes.pop(); bezAutoHandles(); updateContinueUI(); renderEditor();
+  setStatus(S.bez.nodes.length+' anchors','cont');
+}
+function bezToggleMode(i){
+  const nd=S.bez.nodes[i]; if(!nd) return;
+  nd.mode = nd.mode==='corner' ? 'auto' : 'corner';
+  bezAutoHandles();
+  if(S.bez.closed) bezCommit();
+  renderEditor();
+}
+function bezDelete(i){
+  const N=S.bez.nodes;
+  if(S.bez.closed && N.length<=3){ setStatus('A closed curve needs at least 3 anchors','err'); return; }
+  N.splice(i,1); bezAutoHandles();
+  if(S.bez.closed) bezCommit();
+  updateContinueUI(); renderEditor();
+}
+function bezPointerDown(e,p){
+  const hit=bezHit(p), N=S.bez.nodes;
+  if(e.altKey && (!hit || hit.part==='p')){
+    const si=bezHitSeg(p);
+    if(si>=0 && !hit){ bezToggleSeg(si); return; }
+  }
+  if(hit && hit.part==='p'){
+    if(e.shiftKey){ bezDelete(hit.i); return; }
+    if(!S.bez.closed && hit.i===0 && N.length>=3){ bezClose(); return; }
+    S.bezDrag={i:hit.i, part:'p', start:p, orig:bezCopy([N[hit.i]])[0], moved:false};
+  }else if(hit){
+    S.bezDrag={i:hit.i, part:hit.part, alt:e.altKey, moved:false};
+  }else if(!S.bez.closed){
+    // the segment from the previous anchor to this one takes the current Line/Curve
+    // setting; Ctrl-click places the other type for this one segment
+    if(N.length) N[N.length-1].line = (S.bezSeg==='line') !== !!(e.ctrlKey||e.metaKey);
+    N.push({p:p.slice(), hi:p.slice(), ho:p.slice(), mode:'auto', line:false});
+    S.bezDrag={i:N.length-1, part:'new', start:p, moved:false};
+    $('edHint').style.display='none';
+  }else{
+    setStatus('Curve is closed · drag anchors/handles to edit · CLEAR to start over','cont');
+    return;
+  }
+  S.drawing=true; S.edCanvas.setPointerCapture(e.pointerId);
+  bezAutoHandles(); updateContinueUI(); renderEditor();
+}
+function bezPointerMove(e,p){
+  const d=S.bezDrag; if(!d) return;
+  const nd=S.bez.nodes[d.i]; if(!nd) return;
+  d.moved=true;
+  if(d.part==='new'){
+    // pen-style: dragging away from a fresh anchor pulls symmetric handles
+    if(Math.hypot(p[0]-d.start[0],p[1]-d.start[1]) > 3*unitsPerCssPx()){
+      if(d.i>0) S.bez.nodes[d.i-1].line=false;   // pulling handles means this segment curves
+      nd.mode='smooth'; nd.ho=p.slice(); nd.hi=clampPt([2*nd.p[0]-p[0], 2*nd.p[1]-p[1]]);
+    }
+  }else if(d.part==='p'){
+    const dx=p[0]-d.start[0], dy=p[1]-d.start[1];
+    nd.p=clampPt([d.orig.p[0]+dx, d.orig.p[1]+dy]);
+    nd.hi=clampPt([d.orig.hi[0]+dx, d.orig.hi[1]+dy]);
+    nd.ho=clampPt([d.orig.ho[0]+dx, d.orig.ho[1]+dy]);
+  }else{
+    const own=d.part, other=own==='ho'?'hi':'ho';
+    nd[own]=p.slice();
+    if(nd.mode==='auto') nd.mode='smooth';
+    if(!d.alt && !e.altKey){
+      // keep the opposite handle collinear (smooth joint), preserving its length
+      const vx=nd.p[0]-p[0], vy=nd.p[1]-p[1], L=Math.hypot(vx,vy);
+      const Lo=Math.hypot(nd[other][0]-nd.p[0], nd[other][1]-nd.p[1]) || L;
+      if(L>1e-9) nd[other]=clampPt([nd.p[0]+vx/L*Lo, nd.p[1]+vy/L*Lo]);
+    }
+  }
+  bezAutoHandles();
+  if(S.bez.closed) bezShowLive();
+  renderEditor();
+}
+function bezPointerUp(){
+  const d=S.bezDrag; S.bezDrag=null; S.drawing=false;
+  if(S.follow && d && d.part==='new' && S.bez.nodes[d.i]) glideTo(S.bez.nodes[d.i].p);
+  if(d && S.bez.closed && d.moved) bezCommit();
+  else if(!S.bez.closed){
+    const n=S.bez.nodes.length;
+    setStatus(n>=3 ? n+' anchors · click the first (green) anchor or press Enter to close'
+                   : n+' anchor'+(n>1?'s':'')+' · place '+(3-n)+' more (a closed curve needs 3+)','cont');
+  }
+  updateContinueUI(); renderEditor();
+}
+function drawBezier(ctx){
+  const N=S.bez.nodes; if(!N.length) return;
+  const u=unitsPerCssPx(), closed=S.bez.closed;
+  const segs=bezSegs(N,closed);
+  if(segs.length){
+    if(closed){
+      ctx.beginPath(); ctx.moveTo(N[0].p[0],N[0].p[1]);
+      for(const s of segs) ctx.bezierCurveTo(s[1][0],s[1][1],s[2][0],s[2][1],s[3][0],s[3][1]);
+      ctx.closePath(); ctx.fillStyle=penRGBA(.12); ctx.fill();
+    }
+    // one pen colour and width for the whole outline
+    ctx.lineWidth=Pen.width*u; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle=Pen.color;
+    ctx.beginPath(); ctx.moveTo(N[0].p[0],N[0].p[1]);
+    for(const s of segs) ctx.bezierCurveTo(s[1][0],s[1][1],s[2][0],s[2][1],s[3][0],s[3][1]);
+    ctx.stroke();
+  }
+  if(S.tool!=='bezier') return;
+  // while editing, a bar (straight) or dot (curve) marks each segment's type
+  segs.forEach((s,i)=>drawSegMark(ctx, s, bezSegIsLine(i), u));
+  // rubber band: where the next segment would go (solid = line, dashed = curve)
+  if(!closed && S.bezHover && !S.bezDrag){
+    const last=N[N.length-1].p;
+    ctx.save(); if(S.bezSeg!=='line') ctx.setLineDash([6*u,5*u]); ctx.strokeStyle=Pen.color; ctx.globalAlpha=.7; ctx.lineWidth=Math.max(1,Pen.width)*u;
+    ctx.beginPath(); ctx.moveTo(last[0],last[1]); ctx.lineTo(S.bezHover[0],S.bezHover[1]); ctx.stroke(); ctx.restore();
+  }
+  // handles
+  ctx.lineWidth=1*u;
+  N.forEach(nd=>{
+    if(nd.mode==='corner') return;
+    const a = nd.mode==='auto' ? .35 : .85;
+    for(const h of [nd.hi,nd.ho]){
+      if(Math.hypot(h[0]-nd.p[0],h[1]-nd.p[1])<0.5) continue;
+      ctx.strokeStyle='rgba(62,230,255,'+a+')';
+      ctx.beginPath(); ctx.moveTo(nd.p[0],nd.p[1]); ctx.lineTo(h[0],h[1]); ctx.stroke();
+      ctx.fillStyle='rgba(62,230,255,'+a+')';
+      ctx.beginPath(); ctx.arc(h[0],h[1],3.5*u,0,Math.PI*2); ctx.fill();
+    }
+  });
+  // anchors: square = smooth, diamond = corner; first anchor green while open
+  N.forEach((nd,i)=>{
+    const s=5*u, first=(i===0 && !closed && N.length>=3);
+    ctx.fillStyle = first ? '#00ff9d' : '#0b0f1e';
+    ctx.strokeStyle = first ? '#00ff9d' : '#ffc400';
+    ctx.lineWidth=1.5*u;
+    ctx.beginPath();
+    if(nd.mode==='corner'){ ctx.moveTo(nd.p[0],nd.p[1]-s*1.3); ctx.lineTo(nd.p[0]+s*1.3,nd.p[1]); ctx.lineTo(nd.p[0],nd.p[1]+s*1.3); ctx.lineTo(nd.p[0]-s*1.3,nd.p[1]); ctx.closePath(); }
+    else ctx.rect(nd.p[0]-s,nd.p[1]-s,2*s,2*s);
+    ctx.fill(); ctx.stroke();
+  });
+  window.cellAnchorTools?.draw(ctx);
+}
+const mountCellAnchors=()=>{if(window.cellAnchorTools||!S.edCanvas)return;window.cellAnchorTools=ClassicAnchors.mount({toolbar:document.querySelector('.btn-row'),canvas:S.edCanvas,nodes:()=>S.bez.nodes,closed:()=>S.bez.closed,pixel:unitsPerCssPx,point:pointerPt,hit:bezHit,editable:()=>S.tool==='bezier',ensure:()=>{if(!S.bez.nodes.length)editOutline();else setTool('bezier');},checkpoint:()=>History.checkpoint(),commit:()=>{bezAutoHandles();if(S.bez.closed)bezCommit();updateContinueUI();},render:renderEditor,say:message=>setStatus(message,'cont')});};
+function generateShape(tool,s,e){
+  const pts=[]; const dx=e[0]-s[0], dy=e[1]-s[1];
+  if(tool==='rect'){ pts.push([s[0],s[1]],[e[0],s[1]],[e[0],e[1]],[s[0],e[1]],[s[0],s[1]]); }
+  else if(tool==='circle'){
+    const r=Math.hypot(dx,dy);
+    for(let i=0;i<=100;i++){const a=i/100*2*Math.PI; pts.push([s[0]+r*Math.cos(a),s[1]+r*Math.sin(a)]);}
+  }
+  return pts;
+}
+function finishShape(){
+  if(S.currentPoints.length<3){ setStatus('Need 3+ points','err'); return; }
+  const f = fileNow(); if(!f) return;
+  const first=S.currentPoints[0], last=S.currentPoints[S.currentPoints.length-1];
+  if(Math.hypot(first[0]-last[0],first[1]-last[1])>5) S.currentPoints.push(first.slice());
+  const p = patchOf(f, S.cell);
+  p.points = S.currentPoints.slice();
+  p.fromTrace = false;   // hand-drawn now: trace.html must not overwrite it silently
+  p.bezier = null; bezReset(); $('rowBez').classList.add('hide');
+  p.marked = false;
+  S.drawingPaused=false; S.lastEndPoint=null;
+  setStatus('✓ Shape finished ('+S.currentPoints.length+' pts) — click COMPUTE','ok');
+  updateContinueUI(); renderEditor();
+  savePatches(f);
+  refreshProgress();
+}
+function updateContinueUI(){
+  const paused = S.drawingPaused && S.lastEndPoint;
+  const bezOpen = S.tool==='bezier' && !S.bez.closed && S.bez.nodes.length>=3;
+  $('btnContinue').style.display = paused?'inline-block':'none';
+  $('btnFinish').style.display = (paused||bezOpen)?'inline-block':'none';
+  const b=$('padContinue');
+  if(paused){ b.classList.add('on'); b.textContent = S.currentPoints.length+' PTS · CLICK GREEN DOT'; }
+  else b.classList.remove('on');
+}
+function updateCenterDisplay(c){
+  if(!c) return;
+  const f = fileNow(); if(!f) return;
+  $('rCX').textContent = num(c[0]*S.scale,4)+' '+f.unit;
+  $('rCY').textContent = num(c[1]*S.scale,4)+' '+f.unit;
+  $('rCP').textContent = '('+num(c[0],1)+', '+num(c[1],1)+') px';
+}
+function updateMeasurements(){
+  const f = fileNow(); if(!f) return;
+  const p = f.patches[S.cell];
+  if(!p || !p.measurements) return;
+  const m = p.measurements, u = f.unit, u2 = u+'²';
+  if(m.bArea!==undefined){
+    $('rowBez').classList.remove('hide');
+    $('rAreaB').textContent = num(m.bArea,4)+' '+u2;
+  }else $('rowBez').classList.add('hide');
+  $('rArea').textContent = num(m.sArea,4)+' '+u2;
+  $('rAreaF').textContent = num(m.fArea,4)+' '+u2;
+  $('rPerim').textContent = num(m.perim,4)+' '+u;
+  $('rSize').textContent = num(m.w,4)+' × '+num(m.h,4)+' '+u;
+  $('rDir').textContent = m.dir;
+  $('rErr').textContent = num(m.meanErr,4)+' '+u;
+  $('rMax').textContent = num(f.patchW*f.patchH,2)+' '+u2;
+}
+function updateCircleTable(){
+  const f = fileNow(); if(!f) return;
+  const p = f.patches[S.cell];
+  if(!p || !p.tableData) return;
+  const sorted = p.tableData.slice().sort((a,b)=>{
+    let va,vb;
+    switch(S.sortCol){
+      case 'k': va=a.k; vb=b.k; break;
+      case 'amp': va=a.amp; vb=b.amp; break;
+      case 'ph': va=a.phaseDeg; vb=b.phaseDeg; break;
+      case 'dir': va=a.k; vb=b.k; break;
+      case 'cum': va=a.cumArea; vb=b.cumArea; break;
+      default: va=a.rank; vb=b.rank;
+    }
+    return (va-vb)*S.sortDir;
+  });
+  let html='';
+  sorted.forEach((c,i)=>{
+    const fc = c.k>0?'fp':c.k<0?'fn':'fz';
+    const dt = c.k>0?'CCW':c.k<0?'CW':'—';
+    html += '<tr class="'+(i<5?'hl':'')+'"><td>'+(i+1)+'</td><td class="'+fc+'">'+c.k+
+            '</td><td>'+num(c.amp*S.scale,4)+'</td><td>'+num(c.phaseDeg,1)+'°</td><td>'+c.phase.toFixed(4)+'</td><td>'+dt+
+            '</td><td>'+num(c.cumArea*S.scale*S.scale,4)+'</td></tr>';
+  });
+  $('circleTableBody').innerHTML = html;
+}
+function updateEquation(){
+  const f = fileNow(); if(!f) return;
+  const p = f.patches[S.cell];
+  if(!p || !p.tableData) return;
+  const scale = S.scale;
+  let eq = '<div class="et">z(t) = Σ cₖ · e^(i·2π·k·t)</div>';
+  eq += '<div class="et">cₖ = Aₖ · e^(i·φₖ)</div>';
+  p.tableData.slice(0,8).forEach(c=>{
+    const amp=num(c.amp*scale,4), sign=c.phase>=0?'+':'−', ap=num(Math.abs(c.phaseDeg),1);
+    eq += '<div><span class="ev">c'+c.k+'</span> = <span class="en">'+amp+'</span>·e^(i·('+sign+ap+'°))</div>';
+  });
+  if(p.tableData.length>8) eq += '<div style="opacity:.5">… +'+(p.tableData.length-8)+' more</div>';
+  eq += '<div class="et" style="margin-top:6px">Area = |π·Σ(k·|cₖ|²)|</div>';
+  eq += '<div>= <span class="en">'+(p.measurements?num(p.measurements.fArea,4):'—')+' '+f.unit+'²</span></div>';
+  $('eqBox').innerHTML = eq;
+}
+function drawSpectrum(){
+  const f = fileNow(); if(!f) return;
+  const p = f.patches[S.cell];
+  if(!p || !p.tableData) return;
+  const cv=$('specCanvas'), r=cv.getBoundingClientRect();
+  if(!r.width) return;
+  cv.width=r.width*S.dpr; cv.height=r.height*S.dpr;
+  const ctx=cv.getContext('2d');
+  ctx.setTransform(S.dpr,0,0,S.dpr,0,0);
+  const W=r.width, H=r.height;
+  ctx.fillStyle='#0c0f1c'; ctx.fillRect(0,0,W,H);
+  const all=p.tableData.slice().sort((a,b)=>a.k-b.k);
+  const maxAmp=Math.max.apply(null,all.map(c=>c.amp))||1;
+  const minK=all[0].k, maxK=all[all.length-1].k, kR=maxK-minK||1;
+  const barW=Math.max(2,W/all.length-1);
+  all.forEach(c=>{
+    const x=((c.k-minK)/kR)*(W-barW), h=(c.amp/maxAmp)*(H-20);
+    ctx.fillStyle=c.k>0?'#00e676':c.k<0?'#e040fb':'#ffc400';
+    ctx.fillRect(x,H-h-10,barW,h);
+  });
+  ctx.fillStyle='#565f85'; ctx.font='9px monospace';
+  ctx.fillText('k='+minK,2,H-2); ctx.fillText('k='+maxK,W-42,H-2);
+  ctx.fillStyle='#8790b5'; ctx.fillText('AMPLITUDE SPECTRUM',2,10);
+}
+function renderEditor(){
+  const f = fileNow();
+  if(!f || S.cell < 0) return;
+  const ctx=S.edCtx,W=S.patchW,H=S.patchH;
+  ctx.fillStyle='#0b0f1e'; ctx.fillRect(0,0,W,H);
+  fileBitmap(f, function(bmp){
+    if(!bmp) return;
+    const side=Math.min(bmp.width,bmp.height);
+    const r=Math.floor(S.cell/GRID), c=S.cell%GRID;
+    ctx.drawImage(bmp,(bmp.width-side)/2 + c*side/GRID,(bmp.height-side)/2 + r*side/GRID,
+                  side/GRID,side/GRID,0,0,W,H);
+  });
+  ctx.strokeStyle='rgba(255,255,255,.035)'; ctx.lineWidth=1;
+  for(let x=0;x<=W;x+=25){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<=H;y+=25){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // calibration label: small, translucent, and drawn *under* the shapes so it never
+  // hides a drawing that runs along the bottom edge of the patch
+  const lbl=f.patchW+' '+f.unit+' = '+S.patchW+'px · '+f.patchH+' '+f.unit+' = '+S.patchH+'px';
+  ctx.font='10px monospace';
+  ctx.fillStyle='rgba(5,6,15,.45)'; ctx.fillRect(4,H-20,ctx.measureText(lbl).width+12,16);
+  ctx.fillStyle='rgba(200,206,230,.75)'; ctx.fillText(lbl,10,H-8);
+  const p=f.patches[S.cell];
+  const bezShown = S.bez.nodes.length>0;
+  const pu=unitsPerCssPx();
+  if(p&&p.points&&p.points.length>2&&!bezShown){
+    // saved outline: pen colour, a little transparent so the drawing in progress stands out
+    ctx.strokeStyle=penRGBA(.7); ctx.lineWidth=Pen.width*pu; ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo(p.points[0][0],p.points[0][1]);
+    for(let i=1;i<p.points.length;i++) ctx.lineTo(p.points[i][0],p.points[i][1]);
+    ctx.closePath(); ctx.stroke();
+  }
+  if(S.currentPoints.length>1){
+    ctx.strokeStyle=Pen.color; ctx.lineWidth=Pen.width*pu; ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo(S.currentPoints[0][0],S.currentPoints[0][1]);
+    for(let i=1;i<S.currentPoints.length;i++) ctx.lineTo(S.currentPoints[i][0],S.currentPoints[i][1]);
+    ctx.stroke();
+  }
+  if(S.drawingPaused && S.lastEndPoint){
+    ctx.fillStyle='#00ff9d'; ctx.shadowColor='#00ff9d'; ctx.shadowBlur=20;
+    ctx.beginPath(); ctx.arc(S.lastEndPoint[0],S.lastEndPoint[1],12,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#02160c'; ctx.font='bold 12px monospace'; ctx.textAlign='center';
+    ctx.fillText('▶',S.lastEndPoint[0],S.lastEndPoint[1]+4); ctx.textAlign='left';
+  }
+  mountCellAnchors();
+  if(bezShown) drawBezier(ctx);
+  if(p && isDone(p)) drawEpicycles(ctx);
+}
+function drawEpicycles(ctx){
+  const f = fileNow(); if(!f) return;
+  const p=f.patches[S.cell];
+  if(!p||!p.active||!p.centroid) return;
+  let x=p.centroid[0], y=p.centroid[1];
+  for(let i=0;i<p.active.length;i++){
+    const c=p.active[i];
+    const px=x, py=y;
+    const ang=2*Math.PI*c.k*S.t+c.phase;
+    x+=c.amp*Math.cos(ang); y+=c.amp*Math.sin(ang);
+    if(S.showCircles && c.amp>1){
+      ctx.strokeStyle='rgba(62,230,255,'+(i<5?0.7:0.2)+')';
+      ctx.lineWidth=i<5?1.5:0.8;
+      ctx.beginPath(); ctx.arc(px,py,c.amp,0,Math.PI*2); ctx.stroke();
+    }
+    if(S.showArms && c.amp>1){
+      ctx.strokeStyle='rgba(224,64,251,'+(i<5?0.8:0.26)+')';
+      ctx.lineWidth=i<5?2:1;
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(x,y); ctx.stroke();
+    }
+  }
+  if(S.showTrail){
+    if(!S.epiPaused) S.trail.push([x,y]);
+    while(S.trail.length>3000) S.trail.shift();
+    if(S.trail.length>1){
+      ctx.strokeStyle='#ffc400'; ctx.lineWidth=2.5;
+      ctx.shadowColor='#ffc400'; ctx.shadowBlur=12;
+      ctx.beginPath(); ctx.moveTo(S.trail[0][0],S.trail[0][1]);
+      for(let i=1;i<S.trail.length;i++) ctx.lineTo(S.trail[i][0],S.trail[i][1]);
+      ctx.stroke(); ctx.shadowBlur=0;
+    }
+  }
+  ctx.fillStyle='#ffc400'; ctx.shadowColor='#ffc400'; ctx.shadowBlur=12;
+  ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+}
+function loop(){
+  followStep();
+  if(S.cell>=0){
+    const f=fileNow();
+    if(f){
+      const p=f.patches[S.cell];
+      if(p && isDone(p) && !S.epiPaused){
+        S.t += (1/60)*S.speed*0.3;
+        if(S.t>=1){ S.t=0; S.trail=[]; }
+        renderEditor();
+      }
+    }
+  }
+  requestAnimationFrame(loop);
+}
+/* Stop / play the moving circles. While stopped nothing is redrawn each frame
+   (the whole cell used to be redrawn 60 times a second), so the page stays
+   responsive; the choice is remembered (shared with the trace page). */
+function setEpiPaused(on){
+  S.epiPaused = on;
+  try{ localStorage.setItem('epi-paused', on ? '1' : '0'); }catch(e){}
+  const b = $('btnEpiPause');
+  b.innerHTML = on ? '&#9654; Play circles' : '&#10074;&#10074; Stop circles';
+  b.classList.toggle('paused', on);
+  if(S.cell>=0) renderEditor();
+}
+function refreshProgress(){
+  const f = fileNow();
+  if(!f){ $('progLabel').textContent = '0/'+PATCHES; $('progBar').style.width='0%'; return; }
+  const done = measuredCount(f);
+  $('progLabel').textContent = done + '/' + PATCHES;
+  $('progBar').style.width = (done/PATCHES*100).toFixed(1) + '%';
+}
+
+function computePatch(){
+  const f=fileNow(); if(!f) return;
+  if(S.tool==='bezier' && !S.bez.closed && S.bez.nodes.length){
+    // an open Bézier is not a region yet: close it if it can be, otherwise say why not
+    if(S.bez.nodes.length>=3) bezClose();
+    else{ setStatus('Bézier has '+S.bez.nodes.length+' anchor'+(S.bez.nodes.length>1?'s':'')+' — place at least 3, then click the first anchor (or press Enter) to close it','err'); return; }
+  }
+  const p=patchOf(f,S.cell);
+  if(!p.points||p.points.length<3){ setStatus('Draw a shape first!','err'); return; }
+  setStatus('Computing Fourier coefficients…','warn');
+  // key = the cell this result belongs to: the user may switch cells while it runs
+  S.worker.postMessage({pts:p.points.slice(),K:500,numCircles:S.numCircles,key:S.cell});
+}
+function onWorkerMsg(e){
+  const d=e.data, f=fileNow();
+  if(!f) return;
+  if(d.error){ setStatus('Error: '+d.error,'err'); return; }
+  const idx = (typeof d.key === 'number') ? d.key : S.cell;
+  const p = patchOf(f, idx);
+  if(idx !== S.cell){
+    // finished after the user moved to another cell: store it there, quietly
+    storeResult(f, p, d);
+    savePatches(f, idx); refreshProgress();
+    saveCellResult(true, idx);
+    return;
+  }
+  storeResult(f, p, d);
+  S.t=0; S.trail=[];
+  updateCenterDisplay(d.centroid);
+  updateMeasurements(); updateCircleTable(); updateEquation(); drawSpectrum(); renderEditor();
+  if(S.expectedArea!==null && S.expectedArea>0){
+    const pct = Math.abs(p.measurements.fArea - S.expectedArea)/S.expectedArea*100;
+    $('rowErr').classList.remove('hide');
+    $('rErrPct').textContent = num(pct,3)+'%';
+  }
+  setStatus('✓ '+p.active.length+' circles computed — amplitude, phase and frequency listed below','ok');
+  const cb=$('panelCircles').querySelector('.panel-body');
+  if(cb.classList.contains('collapsed')){ cb.classList.remove('collapsed'); $('panelCircles').querySelector('.tg').innerHTML='&#9660;'; }
+  $('panelCircles').scrollIntoView({block:'nearest',behavior:'smooth'});
+  savePatches(f);
+  refreshProgress();
+  saveCellResult(true);
+}
+/* The worker's Fourier result into patch p, in the file's calibrated unit. */
+function storeResult(f, p, d){
+  p.coeffs = d.active;
+  p.active = d.active.map(c=>({k:c.k,amp:c.amp,phase:c.phase}));
+  p.centroid = d.centroid;
+  p.tableData = d.tableData;
+  const sc = f.patchW/S.patchW, sc2 = sc*sc;
+  p.measurements = {
+    fArea:d.fArea*sc2, sArea:d.sArea*sc2, perim:d.perim*sc,
+    w:d.w*sc, h:d.h*sc, meanErr:d.meanErr*sc,
+    cx:d.centroid[0]*sc, cy:d.centroid[1]*sc, dir:d.dir
+  };
+  if(p.bezier && p.bezier.nodes){
+    p.measurements.bArea = bezArea(p.bezier.nodes)*sc2;
+    p.measurements.bPerim = bezLength(p.bezier.nodes,true)*sc;
+  }
+  p.marked = false;
+}
+
+/* One row in measurements + one row per circle, all in the calibrated unit. */
+function cellPayload(f, p, idx){
+  if(idx === undefined) idx = S.cell;
+  const m=p.measurements, sc=S.scale, u=f.unit;
+  const outline = p.bezier && p.bezier.nodes
+    ? {type:'bezier', nodes:p.bezier.nodes.map(n=>({mode:n.mode, segmentToNext:n.line?'line':'curve',
+        anchor:[n.p[0]*sc,n.p[1]*sc], handleIn:[n.hi[0]*sc,n.hi[1]*sc], handleOut:[n.ho[0]*sc,n.ho[1]*sc]}))}
+    : (p.points ? {type:'points', fromTrace:!!p.fromTrace, points:p.points.slice(0,4000).map(q=>[q[0]*sc,q[1]*sc])} : null);
+  const exp = idx === S.cell ? S.expectedArea : null;   // the preset's expected area belongs to the open cell
+  const pct = (exp!==null && exp>0) ? Math.abs(m.fArea-exp)/exp*100 : null;
+  return {
+    image:{id:f.id, name:f.name, cell_width:f.patchW, cell_height:f.patchH, unit:u, grid:GRID},
+    scope:'cell', cell_row:Math.floor(idx/GRID), cell_col:idx%GRID, unit:u,
+    area_bezier: m.bArea!==undefined ? m.bArea : null, area_shoelace:m.sArea, area_fourier:m.fArea,
+    perimeter: m.bPerim!==undefined ? m.bPerim : m.perim, width:m.w, height:m.h,
+    centroid_x:m.cx, centroid_y:m.cy, direction:m.dir, recon_error:m.meanErr,
+    num_circles:p.tableData.length,
+    expected_area:exp, percent_error:pct,
+    outline, saved_by:ResultsCSV.saverName(true),
+    circles:p.tableData.map(c=>({rank:c.rank, freq_k:c.k, amplitude:c.amp*sc, amplitude_px:c.amp,
+      phase_rad:c.phase, phase_deg:c.phaseDeg, direction:c.k>0?'CCW':c.k<0?'CW':'center', cum_area:c.cumArea*sc*sc}))
+  };
+}
+/* Appends this cell's result to the CSV files in the app's results folder
+   (automatically after every COMPUTE, or with the Save button). */
+async function saveCellResult(auto, idx){
+  if(idx === undefined) idx = S.cell;
+  const f=fileNow(); if(!f || idx<0) return;
+  const p=f.patches[idx];
+  if(!p || !p.tableData || !p.measurements){ if(!auto) setStatus('Compute this cell first — nothing to save yet','err'); return; }
+  dbIndicator('💾 saving…','busy');
+  try{
+    await ResultsCSV.save(cellPayload(f,p,idx));
+    dbIndicator(savedStamp(),'ok');
+  }catch(err){
+    dbIndicator('💾 not saved','err');
+    setStatus('Saving results: '+err.message,'err');
+  }
+}
+
+function buildPresetModal(){
+  const f=fileNow();
+  const pw = f?f.patchW:3.4, unit = f?f.unit:'cm';
+  const grid=$('presetGrid');
+  grid.innerHTML='';
+  PRESETS.forEach(preset=>{
+    const exp=preset.areaFn(pw);
+    const c=document.createElement('div');
+    c.style.cssText='border:1px solid var(--line-2);background:var(--panel-2);padding:13px;cursor:pointer;transition:border-color .15s';
+    c.onmouseenter=()=>c.style.borderColor='var(--green)';
+    c.onmouseleave=()=>c.style.borderColor='var(--line-2)';
+    c.innerHTML =
+      '<div style="font-size:22px;margin-bottom:5px">'+preset.icon+'</div>'+
+      '<div style="font-weight:700;font-size:12.5px;margin-bottom:4px">'+preset.name+'</div>'+
+      '<div style="font-size:10px;color:var(--green);background:var(--panel);padding:4px 6px;margin-bottom:5px">'+preset.formula+'</div>'+
+      '<div style="font-size:11px;color:var(--text-dim)">Expected: <b style="color:var(--amber)">'+num(exp,4)+' '+unit+'²</b></div>'+
+      '<div style="font-size:10px;color:var(--text-mute);margin-top:3px">'+preset.desc+'</div>';
+    c.addEventListener('click',()=>loadPreset(preset));
+    grid.appendChild(c);
+  });
+}
+function loadPreset(preset){
+  $('presetModal').classList.remove('open');
+  const f=fileNow(); if(!f) return;
+  const pts=preset.gen(S.patchW,S.patchH,f.patchW);
+  if(pts.length<3) return;
+  History.checkpoint();
+  S.currentPoints=pts;
+  S.expectedArea=preset.areaFn(f.patchW);
+  const p=patchOf(f,S.cell);
+  p.points=pts.slice();
+  p.fromTrace=false;
+  p.bezier=null; bezReset(); $('rowBez').classList.add('hide');
+  p.coeffs=null; p.active=null; p.centroid=null; p.tableData=null; p.measurements=null; p.marked=false;
+  S.drawingPaused=false; S.lastEndPoint=null; S.t=0; S.trail=[];
+  $('rowExp').classList.remove('hide');
+  $('rExp').textContent = num(S.expectedArea,4)+' '+f.unit+'²';
+  $('rExpF').textContent = preset.areaFormula;
+  $('rowErr').classList.add('hide');
+  setStatus('✓ '+preset.name+' loaded ('+pts.length+' pts) — click COMPUTE','ok');
+  renderEditor();
+}
+
+/* ================= export =================
+   Writes the Fourier series for the cell currently open in the editor.
+   tableData holds one row per circle: rank, frequency k, amplitude, phase,
+   direction, and the running cumulative area. All lengths are converted to the
+   file's calibrated unit; amp is scaled by S.scale and cumArea by S.scale². */
+function csvCell(v){ const s = String(v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; }
+function downloadBlob(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function cellBaseName(f, idx){
+  return f.name.replace(/\.[^.]+$/,'') + '_cell_' + coordOf(idx).replace(',','-');
+}
+function currentPatch(){
+  const f = fileNow(); if(!f || S.cell < 0) return null;
+  const p = f.patches[S.cell];
+  return (p && p.tableData) ? p : null;
+}
+function exportCirclesCSV(){
+  const f = fileNow(); if(!f){ setStatus('No map loaded','err'); return; }
+  const p = currentPatch();
+  if(!p){ setStatus('Compute this cell first — no Fourier data','err'); return; }
+  const sc = S.scale;
+  const rows = [['Rank','Freq_k','Amp','Amp_px','Phase_rad','Phase_deg','Dir','CumArea']];
+  p.tableData.forEach(c=>{
+    rows.push([c.rank, c.k, num(c.amp*sc,6), num(c.amp,6),
+               c.phase.toFixed(6), c.phaseDeg.toFixed(4),
+               c.k>0?'CCW':c.k<0?'CW':'center',
+               num(c.cumArea*sc*sc,6)]);
+  });
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\n');
+  downloadBlob(new Blob([csv],{type:'text/csv'}), cellBaseName(f,S.cell) + '_fourier.csv');
+  setStatus('✓ Exported '+p.tableData.length+' circle rows','ok');
+}
+function exportCirclesJSON(){
+  const f = fileNow(); if(!f){ setStatus('No map loaded','err'); return; }
+  const p = currentPatch();
+  if(!p){ setStatus('Compute this cell first — no Fourier data','err'); return; }
+  const sc = S.scale, u = f.unit, u2 = u+'²';
+  const data = {
+    file:f.name, cell:{index:S.cell, coord:'['+coordOf(S.cell)+']'},
+    grid:{rows:f.rows, cols:f.cols},
+    calibration:{patchWidth:f.patchW, patchHeight:f.patchH, unit:u},
+    measurements:p.measurements ? {
+      areaExact:num(p.measurements.sArea,6),
+      areaFourier:num(p.measurements.fArea,6),
+      areaBezier:p.measurements.bArea!==undefined ? num(p.measurements.bArea,6) : null,
+      perimeterBezier:p.measurements.bPerim!==undefined ? num(p.measurements.bPerim,6) : null,
+      perimeter:num(p.measurements.perim,6),
+      width:num(p.measurements.w,6),
+      height:num(p.measurements.h,6),
+      centroid:{x:num(p.measurements.cx,6), y:num(p.measurements.cy,6)},
+      direction:p.measurements.dir,
+      reconstructionError:num(p.measurements.meanErr,6),
+      units:u2
+    } : null,
+    expectedArea: S.expectedArea!==null ? num(S.expectedArea,6) : null,
+    percentError: (S.expectedArea!==null && p.measurements && S.expectedArea>0)
+      ? num(Math.abs(p.measurements.fArea - S.expectedArea)/S.expectedArea*100,4) : null,
+    // cubic Bézier control points in calibrated units; segment i runs
+    // anchor[i] -> handleOut[i] -> handleIn[i+1] -> anchor[i+1], last wraps to first
+    bezier: p.bezier ? p.bezier.nodes.map(n=>({
+      mode:n.mode,
+      segmentToNext: n.line ? 'line' : 'curve',
+      anchor:[num(n.p[0]*sc,6), num(n.p[1]*sc,6)],
+      handleIn:[num(n.hi[0]*sc,6), num(n.hi[1]*sc,6)],
+      handleOut:[num(n.ho[0]*sc,6), num(n.ho[1]*sc,6)]
+    })) : null,
+    circles: p.tableData.map(c=>({
+      rank:c.rank, k:c.k, amplitude:num(c.amp*sc,6), amplitudePx:num(c.amp,6),
+      phaseRad:Number(c.phase.toFixed(6)), phaseDeg:Number(c.phaseDeg.toFixed(4)),
+      direction:c.k>0?'CCW':c.k<0?'CW':'center',
+      cumulativeArea:num(c.cumArea*sc*sc,6)
+    }))
+  };
+  downloadBlob(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),
+               cellBaseName(f,S.cell) + '_fourier.json');
+  setStatus('✓ Exported '+p.tableData.length+' circles as JSON','ok');
+}
+
+/* Fit the square patch canvas into whatever space the flex layout leaves, and keep
+   the backing store at the fixed patch resolution so drawing coords stay stable. */
+function fitCanvas(){
+  const wrap = $('canvasWrap');
+  if(!wrap) return;
+  const r = wrap.getBoundingClientRect();
+  if(!r.width || !r.height) return;
+  const side = Math.max(160, Math.min(r.width, r.height) - 32);
+  S.edCanvas.style.width = side + 'px';
+  S.edCanvas.style.height = side + 'px';
+}
+/* Zoom scales the displayed canvas. Drawing always uses patch coordinates
+   (0..500), so pointer mapping stays valid at any zoom; the backing store is
+   resized to the displayed size so a zoomed cell is redrawn sharp instead of
+   being a stretched 500 px bitmap. */
+const ZOOM_MAX = 12, MAX_BACKING = 3200;
+function syncBacking(side){
+  const px = Math.max(1, Math.min(MAX_BACKING, Math.round(side*S.dpr)));
+  if(S.edCanvas.width!==px || S.edCanvas.height!==px){ S.edCanvas.width=px; S.edCanvas.height=px; }
+  const k = px/S.patchW;
+  S.edCtx.setTransform(k,0,0,k,0,0);
+  S.edCtx.imageSmoothingQuality = 'high';
+}
+function applyZoom(){
+  S.zoom = Math.max(1, Math.min(ZOOM_MAX, S.zoom));
+  if(S.zoom < 1.001){ S.zoom = 1; S.panX = 0; S.panY = 0; }   // fully zoomed out: always centred
+  const base = S.baseSide || S.patchW;
+  const side = base * S.zoom;
+  S.edCanvas.style.width = side + 'px';
+  S.edCanvas.style.height = side + 'px';
+  syncBacking(side);
+  $('gridZoomLabel').textContent = Math.round(S.zoom*100) + '%';
+  updateZoomLabel();
+  applyPan();
+  renderEditor();
+}
+/* Zoom by `factor` keeping the patch point under (cx, cy) where it is.
+   No point given = the centre of the view (buttons, keys). */
+function zoomEditorAt(factor, cx, cy){
+  const w=$('canvasWrap').getBoundingClientRect(), r=S.edCanvas.getBoundingClientRect();
+  if(cx==null){ cx=w.left+w.width/2; cy=w.top+w.height/2; }
+  const old=S.zoom;
+  S.glide=null;                       // a follow glide aimed at the old zoom would jump
+  S.zoom=Math.max(1, Math.min(ZOOM_MAX, S.zoom*factor));
+  const k=S.zoom/old; if(Math.abs(k-1)<1e-9) return;
+  const ccx=r.left+r.width/2, ccy=r.top+r.height/2;
+  S.panX=(cx-(cx-ccx)*k)-(w.left+w.width/2);
+  S.panY=(cy-(cy-ccy)*k)-(w.top+w.height/2);
+  applyZoom();
+}
+function fitZoom(){ S.zoom=1; S.panX=0; S.panY=0; S.glide=null; applyZoom(); }
+/* Wheel -> zoom factor. Normalises line/page wheel units, so a mouse notch is
+   ~15% and a touchpad (many tiny events) zooms smoothly instead of jumping;
+   pinch gestures arrive as ctrl+wheel with small deltas and get more weight. */
+function wheelFactor(e){
+  const unit = e.deltaMode===1 ? 33 : e.deltaMode===2 ? 400 : 1;
+  const dy = Math.max(-300, Math.min(300, e.deltaY*unit));
+  return Math.exp(-dy*(e.ctrlKey ? 0.01 : 0.0015));
+}
+/* Pan: the zoomed canvas is centred in its wrap and shifted by a CSS translate.
+   getBoundingClientRect() includes the translate, so screenToCanvas() needs no
+   change. The shift is clamped so any point of the patch can be brought to the
+   centre (zoom-at-cursor, follow glide) while at least 40 px of it stays in view. */
+function applyPan(){
+  const w=$('canvasWrap').getBoundingClientRect(), side=parseFloat(S.edCanvas.style.width)||S.patchW;
+  const mx=Math.max(0, side/2 + w.width/2  - 40), my=Math.max(0, side/2 + w.height/2 - 40);
+  S.panX=Math.max(-mx,Math.min(mx,S.panX)); S.panY=Math.max(-my,Math.min(my,S.panY));
+  S.edCanvas.style.transform = (S.panX||S.panY) ? 'translate('+S.panX+'px,'+S.panY+'px)' : '';
+}
+/* Move the view by (dx, dy) screen px (wheel swipe, Shift + arrows). */
+function panBy(dx, dy){
+  if(S.zoom <= 1) return;              // the whole cell is in view: nothing to move to
+  S.glide=null; S.panX+=dx; S.panY+=dy; applyPan();
+  if(S.lastEv) onCanvasMove(S.lastEv);
+}
+/* Move tool (✋ button / H): left-drag moves the view instead of drawing. */
+function setHand(on){
+  S.hand=on;
+  $('btnHand').classList.toggle('on', on);
+  updateGrabCursor();
+}
+function updateGrabCursor(){ S.edCanvas.classList.toggle('grab', S.hand || S.spaceHeld); }
+/* ================= follow mode (button / key F) =================
+   - each newly placed Bézier anchor glides to the centre of the view;
+   - while drawing (any tool) or placing Bézier anchors, a pointer within
+     FOLLOW_EDGE px of the visible edge scrolls the cell that way.
+   Only scrolls while part of the cell is hidden in that direction. */
+const FOLLOW_EDGE = 50, FOLLOW_MAX = 16;
+function setFollow(on){
+  S.follow=on;
+  const b=$('btnFollow'); b.textContent='Follow: '+(on?'On':'Off'); b.classList.toggle('on2',on);
+  try{ localStorage.setItem('editor-follow', on?'1':'0'); }catch(e){}
+  if(!on) S.glide=null;
+}
+function glideTo(p){
+  const w=$('canvasWrap').getBoundingClientRect(), r=S.edCanvas.getBoundingClientRect();
+  const ax=r.left+p[0]/S.patchW*r.width, ay=r.top+p[1]/S.patchH*r.height;
+  S.glide={fx:S.panX, fy:S.panY, x:S.panX+(w.left+w.width/2-ax), y:S.panY+(w.top+w.height/2-ay), t0:performance.now(), dur:260};
+}
+function followStep(){
+  if(S.glide){
+    const g=S.glide, k=Math.min(1,(performance.now()-g.t0)/g.dur), e=1-Math.pow(1-k,3);
+    S.panX=g.fx+(g.x-g.fx)*e; S.panY=g.fy+(g.y-g.fy)*e; applyPan();
+    if(k>=1) S.glide=null;
+    if(S.lastEv) onCanvasMove(S.lastEv);
+    return;
+  }
+  if(!S.follow || !S.lastEv || S.panDrag || S.cell<0) return;
+  const tracing = S.drawing || (S.tool==='bezier' && !S.bez.closed && S.bez.nodes.length);
+  if(!tracing) return;
+  const w=$('canvasWrap').getBoundingClientRect(), r=S.edCanvas.getBoundingClientRect();
+  const x=S.lastEv.clientX-w.left, y=S.lastEv.clientY-w.top;
+  const sp=d=> d>=FOLLOW_EDGE ? 0 : FOLLOW_MAX*Math.min(1,(FOLLOW_EDGE-d)/FOLLOW_EDGE);
+  let dx=0, dy=0;
+  if(x<FOLLOW_EDGE && r.left<w.left)              dx= Math.min(sp(x), w.left-r.left);
+  if(x>w.width-FOLLOW_EDGE && r.right>w.right)    dx=-Math.min(sp(w.width-x), r.right-w.right);
+  if(y<FOLLOW_EDGE && r.top<w.top)                dy= Math.min(sp(y), w.top-r.top);
+  if(y>w.height-FOLLOW_EDGE && r.bottom>w.bottom) dy=-Math.min(sp(w.height-y), r.bottom-w.bottom);
+  if(!dx && !dy) return;
+  S.panX+=dx; S.panY+=dy; applyPan();
+  onCanvasMove(S.lastEv);              // the patch point under the cursor changed
+}
+function lastEditNote(p){
+  return p && p.editedBy ? ' · last edited by '+p.editedBy+(p.editedAt?', '+new Date(p.editedAt).toLocaleString():'') : '';
+}
+function openCell(idx){
+  const f = fileNow(); if(!f) return;
+  S.cell = idx;
+  S.scale = f.patchW / S.patchW;
+  const p = patchOf(f, idx);
+  $('edTitle').textContent = f.name.toUpperCase();
+  $('edCell').textContent = 'CELL [' + coordOf(idx) + ']';
+  $('thAmp').textContent = 'Amp ('+f.unit+')';
+  S.edCanvas.width = S.patchW*S.dpr;
+  S.edCanvas.height = S.patchH*S.dpr;
+  fitCanvas();
+  S.baseSide = S.edCanvas.getBoundingClientRect().width || S.patchW;
+  S.zoom = 1; S.panX = 0; S.panY = 0; S.glide = null;
+  syncBacking(S.baseSide); applyPan();
+  bezLoad(p);
+  S.currentPoints = (p.points && !p.bezier) ? p.points.slice() : [];
+  S.t = 0; S.trail = [];
+  S.drawingPaused = false; S.lastEndPoint = null;
+  S.expectedArea = null;
+  $('edHint').style.display = 'none';
+  updateZoomLabel();
+  showPatchState(p);
+  History.reset();   // undo history belongs to one cell
+  refreshProgress();
+}
+/* Results panel, live Bézier area and status for patch p (after opening a cell or undo / redo). */
+function showPatchState(p){
+  // Edit Outline: always shown; usable once the cell has an outline that is not already an editable Bézier
+  const eb = $('btnEditOutline');
+  eb.style.display = 'inline-block';
+  eb.disabled = !(p && p.points && p.points.length > 2 && !(p.bezier && p.bezier.nodes));
+  eb.title = eb.disabled
+    ? (p && p.bezier ? 'This outline is already an editable Bézier — use the Bézier tool and drag its anchors' : 'No outline in this cell yet')
+    : 'Turn this cell\'s outline into a Bézier you can correct here: drag anchors, add / delete them, flip segments straight / curved';
+  resetResultsUI();
+  $('rowExp').classList.toggle('hide', S.expectedArea===null);
+  bezShowLive();
+  updateContinueUI(); renderEditor();
+  if(isDone(p) && p.fromTrace){
+    setStatus('Traced on the whole image — '+p.active.length+' circles · press ✎ EDIT OUTLINE to correct the boundary here'+lastEditNote(p),'ok');
+    updateCenterDisplay(p.centroid); updateMeasurements(); updateCircleTable();
+    updateEquation(); drawSpectrum();
+  }else if(isDone(p)){
+    setStatus('Loaded — '+p.active.length+' circles'+lastEditNote(p),'ok');
+    updateCenterDisplay(p.centroid); updateMeasurements(); updateCircleTable();
+    updateEquation(); drawSpectrum();
+  }else if(p.points && p.points.length > 2){
+    setStatus('Drawing loaded — click COMPUTE'+lastEditNote(p),'ok');
+  }else{
+    setStatus('Ready to draw','cont');
+  }
+}
+
+/* ================= undo / redo (Ctrl+Z, Ctrl+Y) =================
+   A snapshot is the open cell's patch (drawing, Bézier, Fourier result) plus
+   the drawing in progress; checkpoint() runs before every change to it. */
+const History = new UndoHistory(
+  () => {
+    const f = fileNow();
+    return { patch: f && S.cell>=0 ? patchOf(f, S.cell) : null,
+             bez: S.bez, cur: S.currentPoints, paused: S.drawingPaused, last: S.lastEndPoint, exp: S.expectedArea };
+  },
+  s => {
+    const f = fileNow(); if(!f || S.cell<0 || !s.patch) return;
+    const p = f.patches[S.cell] = Object.assign(emptyPatch(), s.patch);
+    S.bez = s.bez; S.bezDrag = null; S.drawing = false;
+    S.currentPoints = s.cur; S.drawingPaused = s.paused; S.lastEndPoint = s.last; S.expectedArea = s.exp;
+    S.t = 0; S.trail = [];
+    showPatchState(p);
+    savePatches(f); refreshProgress();
+  },
+  () => { $('btnUndo').disabled = !History.canUndo(); $('btnRedo').disabled = !History.canRedo(); }
+);
+function undoEdit(){ if(History.undo()) setStatus('↶ Undone — Ctrl+Y to redo','cont'); else setStatus('Nothing to undo in this cell','cont'); }
+function redoEdit(){ if(History.redo()) setStatus('↷ Redone','cont'); else setStatus('Nothing to redo','cont'); }
+
+function setup(){
+  const blob = new Blob([WORKER_CODE],{type:'application/javascript'});
+  S.worker = new Worker(URL.createObjectURL(blob));
+  S.worker.onmessage = onWorkerMsg;
+  S.edCanvas = $('edCanvas');
+  S.edCtx = S.edCanvas.getContext('2d');
+  setTool('freehand');
+
+  $('btnBack').addEventListener('click', ()=>goMatrix(S.cell));
+  $('toolFreehand').addEventListener('click', ()=>{ setTool('freehand'); $('presetModal').classList.remove('open'); });
+  $('toolRect').addEventListener('click', ()=>{ setTool('rect'); $('presetModal').classList.remove('open'); });
+  $('toolCircle').addEventListener('click', ()=>{ setTool('circle'); $('presetModal').classList.remove('open'); });
+  $('toolBezier').addEventListener('click', ()=>{ setTool('bezier'); $('presetModal').classList.remove('open'); });
+  $('btnSegMode').addEventListener('click', ()=>bezSetSegMode(S.bezSeg==='line'?'curve':'line'));
+  $('btnFollow').addEventListener('click', ()=>setFollow(!S.follow));
+  $('btnEditOutline').addEventListener('click', editOutline);
+  buildPenUI(()=>renderEditor());
+  try{ setFollow(localStorage.getItem('editor-follow')==='1'); }catch(e){ setFollow(false); }
+  $('btnPresets').addEventListener('click', ()=>{ buildPresetModal(); $('presetModal').classList.add('open'); });
+  $('presetClose').addEventListener('click', ()=>$('presetModal').classList.remove('open'));
+  $('presetModal').addEventListener('click', e=>{ if(e.target===$('presetModal')) $('presetModal').classList.remove('open'); });
+  $('btnCompute').addEventListener('click', ()=>{ History.checkpoint(); computePatch(); });
+  $('btnUndo').addEventListener('click', undoEdit);
+  $('btnRedo').addEventListener('click', redoEdit);
+  History.bindKeys(()=>S.cell<0 || S.drawing, undoEdit, redoEdit);
+  $('btnExportCirclesCsv').addEventListener('click', exportCirclesCSV);
+  $('btnExportCirclesJson').addEventListener('click', exportCirclesJSON);
+  $('btnSaveDb').addEventListener('click', ()=>saveCellResult(false));
+  $('btnContinue').addEventListener('click', ()=>{
+    if(S.drawingPaused && S.lastEndPoint){
+      S.drawingPaused=false; S.drawing=true; S.lineStart=S.lastEndPoint;
+      S.edCanvas.classList.add('drawing');
+      setStatus('▶ Continuing… drag to draw','cont');
+      updateContinueUI();
+    }
+  });
+  $('btnFinish').addEventListener('click', ()=>{ History.checkpoint(); if(S.tool==='bezier') bezClose(); else finishShape(); });
+  $('btnClearPatch').addEventListener('click', async ()=>{
+    const f=fileNow(); if(!f) return;
+    History.checkpoint();
+    const p=patchOf(f,S.cell);
+    p.points=null; p.coeffs=null; p.active=null; p.centroid=null;
+    p.tableData=null; p.measurements=null; p.marked=false; p.bezier=null; p.fromTrace=false;
+    bezReset(); $('rowBez').classList.add('hide');
+    S.currentPoints=[]; S.t=0; S.trail=[]; S.drawingPaused=false; S.lastEndPoint=null; S.expectedArea=null;
+    ['rCX','rCY','rCP','rArea','rAreaF','rPerim','rSize','rDir','rErr'].forEach(id=>$(id).textContent='—');
+    $('rowExp').classList.add('hide'); $('rowErr').classList.add('hide');
+    $('eqBox').textContent='Compute epicycles to reveal the Fourier equation…';
+    $('circleTableBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--text-mute)">Compute to see circle data</td></tr>';
+    updateContinueUI(); renderEditor();
+    savePatches(f); refreshProgress();
+  });
+  $('btnZIn').addEventListener('click', ()=>zoomEditorAt(1.3));
+  $('btnZOut').addEventListener('click', ()=>zoomEditorAt(1/1.3));
+  $('btnZFit').addEventListener('click', fitZoom);
+  $('btnHand').addEventListener('click', ()=>setHand(!S.hand));
+  $('btnCornerPrev').addEventListener('click', ()=>step(-1));
+  $('btnCornerNext').addEventListener('click', ()=>step(1));
+  $('btnEpiPause').addEventListener('click', ()=>setEpiPaused(!S.epiPaused));
+  let epiStopped = false; try{ epiStopped = localStorage.getItem('epi-paused')==='1'; }catch(e){}
+  if(epiStopped) setEpiPaused(true);
+  $('btnGridIn').addEventListener('click', ()=>zoomEditorAt(1.3));
+  $('btnGridOut').addEventListener('click', ()=>zoomEditorAt(1/1.3));
+
+  let fitTimer = null;
+  window.addEventListener('resize', ()=>{
+    if(fitTimer) clearTimeout(fitTimer);
+    fitTimer = setTimeout(()=>{ S.zoom = 1; S.panX = 0; S.panY = 0; fitCanvas(); S.baseSide = S.edCanvas.getBoundingClientRect().width; applyZoom(); }, 120);
+  });
+
+  document.addEventListener('keydown', e=>{
+    if(e.key==='Shift') S.shiftHeld=true;
+    if(S.cell>=0 && (e.key==='f'||e.key==='F') && !e.ctrlKey && !e.metaKey && !/INPUT|TEXTAREA/.test(e.target.tagName)){ setFollow(!S.follow); return; }
+    if(S.cell>=0 && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){
+      if(e.key==='+'||e.key==='='){ e.preventDefault(); zoomEditorAt(1.3); return; }
+      if(e.key==='-'||e.key==='_'){ e.preventDefault(); zoomEditorAt(1/1.3); return; }
+      if(e.key==='0'){ e.preventDefault(); fitZoom(); return; }
+      if(e.key==='p'||e.key==='P'){ e.preventDefault(); setEpiPaused(!S.epiPaused); return; }
+      if(e.key==='h'||e.key==='H'){ e.preventDefault(); setHand(!S.hand); return; }
+      if(e.code==='Space'){ e.preventDefault(); if(!S.spaceHeld){ S.spaceHeld=true; updateGrabCursor(); } return; }
+      // Shift + arrows move the zoomed view (plain arrows change cell)
+      if(e.shiftKey && !S.drawing){
+        const st=80, mv={ArrowLeft:[st,0], ArrowRight:[-st,0], ArrowUp:[0,st], ArrowDown:[0,-st]}[e.key];
+        if(mv){ e.preventDefault(); panBy(mv[0], mv[1]); return; }
+      }
+      // cell / image navigation (not while a stroke or drag is in progress)
+      if(!S.drawing && !e.shiftKey){
+        const nav = { ArrowLeft:()=>step(-1), ArrowRight:()=>step(1), ArrowUp:()=>step(-GRID), ArrowDown:()=>step(GRID),
+                      '[':()=>stepImage(-1), ']':()=>stepImage(1) }[e.key];
+        if(nav){ e.preventDefault(); nav(); return; }
+      }
+    }
+    if(S.tool!=='bezier' || S.cell<0 || /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+    if((e.key==='l'||e.key==='L') && !e.ctrlKey && !e.metaKey){ bezSetSegMode(S.bezSeg==='line'?'curve':'line'); }
+    else if(e.key==='Enter' && !S.bez.closed){ e.preventDefault(); History.checkpoint(); bezClose(); }
+    else if((e.key==='Backspace'||e.key==='Delete') && !S.bez.closed){ e.preventDefault(); History.checkpoint(); bezUndoPoint(); }
+    else if(e.key==='Escape' && !S.bez.closed){ History.checkpoint(); bezReset(); updateContinueUI(); renderEditor(); setStatus('Bézier discarded','cont'); }
+  });
+  document.addEventListener('keyup',   e=>{
+    if(e.key==='Shift') S.shiftHeld=false;
+    if(e.code==='Space' && S.spaceHeld){ S.spaceHeld=false; updateGrabCursor(); if(!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) e.preventDefault(); }
+  });
+  window.addEventListener('blur', ()=>{ if(S.spaceHeld){ S.spaceHeld=false; updateGrabCursor(); } });
+
+  document.querySelectorAll('.panel-head').forEach(h=>{
+    h.addEventListener('click', ()=>{
+      const body=h.nextElementSibling, tg=h.querySelector('.tg');
+      if(!body) return;
+      const c=body.classList.toggle('collapsed');
+      tg.innerHTML = c?'&#9654;':'&#9660;';
+    });
+  });
+  document.querySelectorAll('.ctable th[data-s]').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const col=th.getAttribute('data-s');
+      if(S.sortCol===col) S.sortDir*=-1; else { S.sortCol=col; S.sortDir=-1; }
+      updateCircleTable();
+    });
+  });
+
+  $('rngCircles').addEventListener('input', e=>{
+    S.numCircles=parseInt(e.target.value);
+    $('valCircles').textContent=S.numCircles;
+    const f=fileNow(); if(!f) return;
+    const p=f.patches[S.cell];
+    if(p&&p.coeffs){
+      p.active=p.coeffs.slice(0,S.numCircles).map(c=>({k:c.k,amp:c.amp,phase:c.phase}));
+      S.trail=[]; S.t=0;
+      updateMeasurements(); updateCircleTable(); updateEquation(); drawSpectrum();
+    }
+  });
+  $('rngSpeed').addEventListener('input', e=>{
+    S.speed=parseFloat(e.target.value);
+    $('valSpeed').textContent=S.speed.toFixed(1)+'x';
+  });
+  $('chkCircles').addEventListener('change', e=>{ S.showCircles=e.target.checked; });
+  $('chkArms').addEventListener('change', e=>{ S.showArms=e.target.checked; });
+  $('chkTrail').addEventListener('change', e=>{ S.showTrail=e.target.checked; if(!S.showTrail) S.trail=[]; });
+
+  setupCanvas(); setupCanvas2();
+  requestAnimationFrame(loop);
+}
+function setupCanvas(){
+  const cv=S.edCanvas;
+  cv.addEventListener('contextmenu', e=>e.preventDefault());
+  cv.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    // right / middle drag, or left drag with the move tool (✋ / H) or Space held, moves the zoomed cell
+    if(e.button===1 || e.button===2 || (e.button===0 && (S.hand || S.spaceHeld) && !S.drawing)){
+      S.panDrag={x:e.clientX, y:e.clientY, px:S.panX, py:S.panY}; S.glide=null;
+      cv.setPointerCapture(e.pointerId); cv.classList.add('grabbing'); return;
+    }
+    if(e.button!==0) return;
+    History.checkpoint();
+    const p=pointerPt(e);
+    if(S.tool==='bezier'){ bezPointerDown(e,p); return; }
+    if(S.tool==='freehand'){
+      if(S.drawingPaused && S.lastEndPoint &&
+         Math.hypot(p[0]-S.lastEndPoint[0],p[1]-S.lastEndPoint[1])<25){
+        S.drawingPaused=false; S.drawing=true; S.lineStart=S.lastEndPoint;
+        cv.setPointerCapture(e.pointerId); cv.classList.add('drawing');
+        setStatus('▶ Continuing from last point…','cont'); updateContinueUI(); return;
+      }
+      if(S.drawingPaused && S.currentPoints.length>=3){
+        const first=S.currentPoints[0];
+        if(Math.hypot(p[0]-first[0],p[1]-first[1])<25){ finishShape(); return; }
+      }
+      S.drawing=true; S.drawingPaused=false;
+      S.currentPoints=[]; S.trail=[]; S.t=0;
+      S.lineStart=p; S.currentPoints.push(p);
+      cv.setPointerCapture(e.pointerId); cv.classList.add('drawing');
+      $('edHint').style.display='none';
+      setStatus('Drawing freehand… release to pause','warn');
+      updateContinueUI();
+    }else{
+      S.shapeStart=p; S.drawing=true; cv.setPointerCapture(e.pointerId);
+    }
+  });
+  cv.addEventListener('pointermove', e=>{
+    S.lastEv={clientX:e.clientX, clientY:e.clientY, altKey:e.altKey, ctrlKey:e.ctrlKey, metaKey:e.metaKey};
+    if(S.panDrag){
+      S.panX=S.panDrag.px+e.clientX-S.panDrag.x; S.panY=S.panDrag.py+e.clientY-S.panDrag.y; applyPan(); return;
+    }
+    onCanvasMove(e);
+  });
+  cv.addEventListener('pointerleave', ()=>{ if(!S.drawing) S.lastEv=null; });
+}
+/* Pointer move on the patch canvas. Also called by follow mode with the last
+   pointer position while the view scrolls under a still mouse. */
+function onCanvasMove(e){
+    if(!e.preventDefault) e.preventDefault=()=>{};
+    if(!S.drawing && S.tool==='bezier' && !S.bez.closed && S.bez.nodes.length){
+      S.bezHover=pointerPt(e); renderEditor(); return;
+    }
+    if(!S.drawing) return;
+    e.preventDefault();
+    const p=pointerPt(e);
+    if(S.tool==='bezier'){ bezPointerMove(e,p); return; }
+    if(S.tool==='freehand'){
+      if(S.shiftHeld){ S.currentPoints=[S.lineStart.slice(),p.slice()]; }
+      else{
+        let evts=e.getCoalescedEvents?e.getCoalescedEvents():[];
+        if(!evts.length) evts=[e];          // some browsers / synthetic events report none
+        for(const ev of evts){
+          const cp=pointerPt(ev);
+          const last=S.currentPoints[S.currentPoints.length-1];
+          if(last && Math.hypot(cp[0]-last[0],cp[1]-last[1])<0.5) continue;
+          S.currentPoints.push(cp);
+        }
+      }
+    }else{
+      S.currentPoints=generateShape(S.tool,S.shapeStart,p);
+    }
+    renderEditor();
+}
+function setupCanvas2(){
+  const cv=S.edCanvas;
+  cv.addEventListener('dblclick', e=>{
+    if(S.tool!=='bezier') return;
+    History.checkpoint();
+    const p=pointerPt(e), hit=bezHit(p);
+    if(hit && hit.part==='p') bezToggleMode(hit.i);
+    else if(!hit && S.bez.closed){ const si=bezHitSeg(p); if(si>=0) bezToggleSeg(si); }
+  });
+  cv.addEventListener('pointerleave', ()=>{ if(S.bezHover){ S.bezHover=null; renderEditor(); } });
+  cv.addEventListener('pointerup', ()=>{
+    if(S.panDrag){ S.panDrag=null; cv.classList.remove('grabbing'); return; }
+    if(!S.drawing) return;
+    if(S.tool==='bezier'){ bezPointerUp(); return; }
+    S.drawing=false; cv.classList.remove('drawing');
+    if(S.tool==='freehand'){
+      if(S.shiftHeld && S.currentPoints.length===2){
+        const s=S.currentPoints[0],en=S.currentPoints[1];
+        const dx=en[0]-s[0],dy=en[1]-s[1],len=Math.hypot(dx,dy);
+        if(len<5){ setStatus('Line too short','err'); S.currentPoints=[]; }
+        else{
+          const nx=-dy/len,ny=dx/len;
+          S.currentPoints=[[s[0]+nx,s[1]+ny],[en[0]+nx,en[1]+ny],[en[0]-nx,en[1]-ny],[s[0]-nx,s[1]-ny],[s[0]+nx,s[1]+ny]];
+          finishShape();
+        }
+      }else if(S.currentPoints.length>=2){
+        S.lastEndPoint=S.currentPoints[S.currentPoints.length-1].slice();
+        S.drawingPaused=true;
+        setStatus('Paused · click green dot to continue','cont');
+      }else{
+        S.currentPoints=[]; S.drawingPaused=false; S.lastEndPoint=null;
+      }
+    }else if(S.currentPoints.length>=3){
+      finishShape();
+    }else{
+      setStatus('Need more points','err'); S.currentPoints=[];
+    }
+    updateContinueUI(); renderEditor();
+  });
+  cv.addEventListener('pointercancel', ()=>{ if(S.panDrag){ S.panDrag=null; cv.classList.remove('grabbing'); return; } if(S.tool==='bezier'){ bezPointerUp(); return; } S.drawing=false; cv.classList.remove('drawing'); });
+  // on the whole stage, not just the canvas, so the wheel also works over the
+  // margin around a zoomed-out cell. Plain wheel / pinch zooms about the cursor;
+  // a sideways touchpad swipe or Shift + wheel moves the view instead.
+  $('canvasWrap').addEventListener('wheel', e=>{
+    e.preventDefault();
+    if(S.cell<0) return;
+    const unit = e.deltaMode===1 ? 33 : e.deltaMode===2 ? 400 : 1;
+    if(!e.ctrlKey && (e.shiftKey || Math.abs(e.deltaX) > 0.5)){
+      // Shift + wheel: browsers report it as deltaY (some already as deltaX)
+      const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX, dy = e.shiftKey ? 0 : e.deltaY;
+      panBy(-dx*unit, -dy*unit); return;
+    }
+    zoomEditorAt(wheelFactor(e), e.clientX, e.clientY);
+  },{passive:false});
+}
+
+function showNoSelection(){
+  $('emptyState').style.display = 'block';
+  $('canvasWrap').style.display = 'none';
+  document.querySelector('.ed-side').style.display = 'none';
+}
+
+(async function boot(){
+  // the logged-in username (session.js); corrected once the server confirms it
+  S.user = (window.Session && Session.user) || 'unknown';
+  $('onlineUser').textContent = S.user;
+  window.addEventListener('session-user', e => { S.user = e.detail; });
+  setup();
+  try{
+    S.db = await openDB();
+    S.files = await loadFiles(param('f') || localStorage.getItem('dash-current'));
+  }catch(err){
+    setStatus('Storage unavailable: '+err.message,'err');
+    S.files = [];
+  }
+
+  if(!S.files.length){ showNoSelection(); return; }
+
+  // the image loadFiles() fetched in full (?f=, else the last one opened, else the newest)
+  let idx = S.files.findIndex(f=>f.loaded);
+  if(idx < 0) idx = 0;
+  S.current = idx;
+
+  const f = fileNow();
+  const cParam = param('c');
+  let cell = (cParam !== null && !isNaN(parseInt(cParam,10))) ? parseInt(cParam,10) : -1;
+  if(cell < 0 || cell >= PATCHES) cell = 0;
+
+  $('padInfo').textContent = f.patchW + '×' + f.patchH + ' ' + f.unit +
+    ' · Max: ' + num(f.patchW*f.patchH,2) + ' ' + f.unit + '²';
+  localStorage.setItem('dash-current', f.id);
+  openCell(cell);
+})();
+</script>
+<script type="module" src="sam/editor-adapter.js"></script>
+</body>
+</html>
